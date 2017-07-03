@@ -387,6 +387,23 @@ window_destroy(struct window *w)
 	free(w);
 }
 
+int
+window_pane_destroy_ready(struct window_pane *wp)
+{
+	int	n;
+
+	if (wp->pipe_fd != -1) {
+		if (EVBUFFER_LENGTH(wp->pipe_event->output) != 0)
+			return (0);
+		if (ioctl(wp->fd, FIONREAD, &n) != -1 && n > 0)
+			return (0);
+	}
+
+	if (~wp->flags & PANE_EXITED)
+		return (0);
+	return (1);
+}
+
 void
 window_add_ref(struct window *w, const char *from)
 {
@@ -1014,7 +1031,11 @@ window_pane_error_callback(__unused struct bufferevent *bufev,
 {
 	struct window_pane *wp = data;
 
-	server_destroy_pane(wp, 1);
+	log_debug("%%%u error", wp->id);
+	wp->flags |= PANE_EXITED;
+
+	if (window_pane_destroy_ready(wp))
+		server_destroy_pane(wp, 1);
 }
 
 void
