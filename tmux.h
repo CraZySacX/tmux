@@ -2000,7 +2000,7 @@ char	*grid_string_cells(struct grid *, u_int, u_int, u_int,
 	     struct grid_cell **, int, int, int);
 void	 grid_duplicate_lines(struct grid *, u_int, struct grid *, u_int,
 	     u_int);
-u_int	 grid_reflow(struct grid *, struct grid *, u_int);
+void	 grid_reflow(struct grid *, u_int, u_int *);
 
 /* grid-view.c */
 void	 grid_view_get_cell(struct grid *, u_int, u_int, struct grid_cell *);
@@ -2217,6 +2217,8 @@ void		 layout_assign_pane(struct layout_cell *, struct window_pane *);
 struct layout_cell *layout_split_pane(struct window_pane *, enum layout_type,
 		     int, int, int);
 void		 layout_close_pane(struct window_pane *);
+int		 layout_spread_cell(struct window *, struct layout_cell *);
+void		 layout_spread_out(struct window_pane *);
 
 /* layout-custom.c */
 char		*layout_dump(struct layout_cell *);
