@@ -61,7 +61,6 @@
 	  not attached to a cell at all. this could be the time to introduce
 	  panelink to replace layout_cell
 	* way to set hints/limits about pane size for resizing
-	* panning over window (window larger than visible)
 	* a mode where one application can cross two panes (ie x|y, width =
 	  COLUMNS/2 but height = ROWS * 2)
 	* separate active panes for different clients
@@ -131,3 +130,9 @@
 	* finish hooks for notifys
 	* for session_closed, if no sessions at all, perhaps fake up a
 	  temporary one
+
+- pan
+	* tty_window_offset should try to keep as much as active pane
+	  visible as possible
+	* rather than centering cursor it might be better if only
+	  moved offset when it gets close to an edge?
