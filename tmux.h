@@ -46,6 +46,7 @@ struct cmdq_list;
 struct environ;
 struct format_job_tree;
 struct input_ctx;
+struct job;
 struct mode_tree_data;
 struct mouse_event;
 struct options;
@@ -124,13 +125,17 @@ struct tmuxproc;
 #define KEYC_CLICK_TIMEOUT 300
 
 /* Mouse key codes. */
-#define KEYC_MOUSE_KEY(name)				\
-	KEYC_ ## name ## _PANE,				\
-	KEYC_ ## name ## _STATUS,			\
+#define KEYC_MOUSE_KEY(name)					\
+	KEYC_ ## name ## _PANE,					\
+	KEYC_ ## name ## _STATUS,				\
+	KEYC_ ## name ## _STATUS_LEFT,				\
+	KEYC_ ## name ## _STATUS_RIGHT,				\
 	KEYC_ ## name ## _BORDER
-#define KEYC_MOUSE_STRING(name, s)			\
-	{ #s "Pane", KEYC_ ## name ## _PANE },		\
-	{ #s "Status", KEYC_ ## name ## _STATUS },	\
+#define KEYC_MOUSE_STRING(name, s)				\
+	{ #s "Pane", KEYC_ ## name ## _PANE },			\
+	{ #s "Status", KEYC_ ## name ## _STATUS },		\
+	{ #s "StatusLeft", KEYC_ ## name ## _STATUS_LEFT },	\
+	{ #s "StatusRight", KEYC_ ## name ## _STATUS_RIGHT },	\
 	{ #s "Border", KEYC_ ## name ## _BORDER }
 
 /*
@@ -622,37 +627,6 @@ struct hook {
 
 	RB_ENTRY(hook)	 entry;
 };
-
-/* Scheduled job. */
-struct job;
-typedef void (*job_update_cb) (struct job *);
-typedef void (*job_complete_cb) (struct job *);
-typedef void (*job_free_cb) (void *);
-struct job {
-	enum {
-		JOB_RUNNING,
-		JOB_DEAD,
-		JOB_CLOSED
-	} state;
-
-	int			 flags;
-#define JOB_NOWAIT 0x1
-
-	char			*cmd;
-	pid_t			 pid;
-	int			 status;
-
-	int			 fd;
-	struct bufferevent	*event;
-
-	job_update_cb		 updatecb;
-	job_complete_cb		 completecb;
-	job_free_cb		 freecb;
-	void			*data;
-
-	LIST_ENTRY(job)		 entry;
-};
-LIST_HEAD(joblist, job);
 
 /* Virtual screen. */
 struct screen_sel;
@@ -1309,6 +1283,9 @@ struct status_line {
 	struct screen	*old_status;
 
 	int		 window_list_offset;
+
+	u_int            left_size;
+	u_int            right_size;
 };
 
 /* Client connection. */
@@ -1652,11 +1629,20 @@ void		 options_style_update_old(struct options *,
 extern const struct options_table_entry options_table[];
 
 /* job.c */
-extern struct joblist all_jobs;
+typedef void (*job_update_cb) (struct job *);
+typedef void (*job_complete_cb) (struct job *);
+typedef void (*job_free_cb) (void *);
+#define JOB_NOWAIT 0x1
 struct job	*job_run(const char *, struct session *, const char *,
 		     job_update_cb, job_complete_cb, job_free_cb, void *, int);
 void		 job_free(struct job *);
-void		 job_died(struct job *, int);
+void		 job_check_died(pid_t, int);
+int		 job_get_status(struct job *);
+void		*job_get_data(struct job *);
+struct bufferevent *job_get_event(struct job *);
+void		 job_kill_all(void);
+int		 job_still_running(void);
+void		 job_print_summary(struct cmdq_item *, int);
 
 /* environ.c */
 struct environ *environ_create(void);
