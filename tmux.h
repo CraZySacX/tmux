@@ -63,11 +63,8 @@ struct tmuxproc;
 #define TMUX_CONF "/etc/tmux.conf"
 #endif
 
-/*
- * Minimum layout cell size, NOT including separator line. The scroll region
- * cannot be one line in height so this must be at least two.
- */
-#define PANE_MINIMUM 2
+/* Minimum layout cell size, NOT including border lines. */
+#define PANE_MINIMUM 1
 
 /* Minimum and maximum window size. */
 #define WINDOW_MINIMUM PANE_MINIMUM
@@ -1357,11 +1354,16 @@ struct client {
 #define CLIENT_SIZECHANGED 0x400000
 #define CLIENT_STATUSOFF 0x800000
 #define CLIENT_REDRAWSTATUSALWAYS 0x1000000
-#define CLIENT_ALLREDRAWFLAGS \
-	(CLIENT_REDRAWWINDOW| \
-	 CLIENT_REDRAWSTATUS| \
-	 CLIENT_REDRAWSTATUSALWAYS| \
+#define CLIENT_ALLREDRAWFLAGS		\
+	(CLIENT_REDRAWWINDOW|		\
+	 CLIENT_REDRAWSTATUS|		\
+	 CLIENT_REDRAWSTATUSALWAYS|	\
 	 CLIENT_REDRAWBORDERS)
+#define CLIENT_NOSIZEFLAGS	\
+	(CLIENT_EXIT|		\
+	 CLIENT_DEAD|		\
+	 CLIENT_SUSPENDED|	\
+	 CLIENT_DETACHING)
 	int		 flags;
 	struct key_table *keytable;
 
@@ -1664,7 +1666,7 @@ struct environ *environ_for_session(struct session *, int);
 
 /* tty.c */
 void	tty_create_log(void);
-int	tty_window_bigger(struct tty *);
+int	tty_window_bigger(struct tty *, struct window *);
 int	tty_window_offset(struct tty *, u_int *, u_int *, u_int *, u_int *);
 void	tty_update_window_offset(struct window *);
 void	tty_update_client_offset(struct client *);
@@ -2179,7 +2181,7 @@ void		 window_pane_key(struct window_pane *, struct client *,
 		     struct session *, key_code, struct mouse_event *);
 int		 window_pane_visible(struct window_pane *);
 u_int		 window_pane_search(struct window_pane *, const char *);
-const char	*window_printable_flags(struct winlink *);
+const char	*window_printable_flags(struct winlink *, struct client *);
 struct window_pane *window_pane_find_up(struct window_pane *);
 struct window_pane *window_pane_find_down(struct window_pane *);
 struct window_pane *window_pane_find_left(struct window_pane *);

@@ -701,11 +701,9 @@ tty_repeat_space(struct tty *tty, u_int n)
 
 /* Is this window bigger than the terminal? */
 int
-tty_window_bigger(struct tty *tty)
+tty_window_bigger(struct tty *tty, struct window *w)
 {
 	struct client	*c = tty->client;
-	struct session	*s = c->session;
-	struct window	*w = s->curw->window;
 
 	return (tty->sx < w->sx || tty->sy - status_line_size(c) < w->sy);
 }
@@ -940,8 +938,6 @@ tty_clamp_line(struct tty *tty, const struct tty_ctx *ctx, u_int px, u_int py,
 	}
 	if (*rx > nx)
 		fatalx("%s: x too big, %u > %u", __func__, *rx, nx);
-	if (nx > *rx)
-		*rx = nx;
 
 	return (1);
 }
@@ -1037,8 +1033,6 @@ tty_clamp_area(struct tty *tty, const struct tty_ctx *ctx, u_int px, u_int py,
 	}
 	if (*rx > nx)
 		fatalx("%s: x too big, %u > %u", __func__, *rx, nx);
-	if (nx > *rx)
-		*rx = nx;
 
 	if (yoff >= ctx->oy && yoff + ny <= ctx->oy + ctx->sy) {
 		/* All visible. */
@@ -1063,8 +1057,6 @@ tty_clamp_area(struct tty *tty, const struct tty_ctx *ctx, u_int px, u_int py,
 	}
 	if (*ry > ny)
 		fatalx("%s: y too big, %u > %u", __func__, *ry, ny);
-	if (ny > *ry)
-		*ry = ny;
 
 	return (1);
 }
@@ -1449,7 +1441,9 @@ tty_cmd_insertline(struct tty *tty, const struct tty_ctx *ctx)
 	    !tty_pane_full_width(tty, ctx) ||
 	    tty_fake_bce(tty, ctx->wp, ctx->bg) ||
 	    !tty_term_has(tty->term, TTYC_CSR) ||
-	    !tty_term_has(tty->term, TTYC_IL1)) {
+	    !tty_term_has(tty->term, TTYC_IL1) ||
+	    ctx->wp->sx == 1 ||
+	    ctx->wp->sy == 1) {
 		tty_redraw_region(tty, ctx);
 		return;
 	}
@@ -1471,7 +1465,9 @@ tty_cmd_deleteline(struct tty *tty, const struct tty_ctx *ctx)
 	    !tty_pane_full_width(tty, ctx) ||
 	    tty_fake_bce(tty, ctx->wp, ctx->bg) ||
 	    !tty_term_has(tty->term, TTYC_CSR) ||
-	    !tty_term_has(tty->term, TTYC_DL1)) {
+	    !tty_term_has(tty->term, TTYC_DL1) ||
+	    ctx->wp->sx == 1 ||
+	    ctx->wp->sy == 1) {
 		tty_redraw_region(tty, ctx);
 		return;
 	}
@@ -1532,7 +1528,9 @@ tty_cmd_reverseindex(struct tty *tty, const struct tty_ctx *ctx)
 	    !tty_pane_full_width(tty, ctx) ||
 	    tty_fake_bce(tty, wp, 8) ||
 	    !tty_term_has(tty->term, TTYC_CSR) ||
-	    !tty_term_has(tty->term, TTYC_RI)) {
+	    !tty_term_has(tty->term, TTYC_RI) ||
+	    ctx->wp->sx == 1 ||
+	    ctx->wp->sy == 1) {
 		tty_redraw_region(tty, ctx);
 		return;
 	}
@@ -1557,7 +1555,9 @@ tty_cmd_linefeed(struct tty *tty, const struct tty_ctx *ctx)
 	if (ctx->bigger ||
 	    (!tty_pane_full_width(tty, ctx) && !tty_use_margin(tty)) ||
 	    tty_fake_bce(tty, wp, 8) ||
-	    !tty_term_has(tty->term, TTYC_CSR)) {
+	    !tty_term_has(tty->term, TTYC_CSR) ||
+	    wp->sx == 1 ||
+	    wp->sy == 1) {
 		tty_redraw_region(tty, ctx);
 		return;
 	}
@@ -1594,7 +1594,9 @@ tty_cmd_scrollup(struct tty *tty, const struct tty_ctx *ctx)
 	if (ctx->bigger ||
 	    (!tty_pane_full_width(tty, ctx) && !tty_use_margin(tty)) ||
 	    tty_fake_bce(tty, wp, 8) ||
-	    !tty_term_has(tty->term, TTYC_CSR)) {
+	    !tty_term_has(tty->term, TTYC_CSR) ||
+	    wp->sx == 1 ||
+	    wp->sy == 1) {
 		tty_redraw_region(tty, ctx);
 		return;
 	}
