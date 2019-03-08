@@ -45,6 +45,7 @@ struct cmdq_item;
 struct cmdq_list;
 struct environ;
 struct format_job_tree;
+struct format_tree;
 struct input_ctx;
 struct job;
 struct mode_tree_data;
@@ -694,23 +695,36 @@ struct screen_write_ctx {
  * Window mode. Windows can be in several modes and this is used to call the
  * right function to handle input and output.
  */
+struct window_mode_entry;
 struct window_mode {
 	const char	*name;
 
-	struct screen	*(*init)(struct window_pane *, struct cmd_find_state *,
-			     struct args *);
-	void		 (*free)(struct window_pane *);
-	void		 (*resize)(struct window_pane *, u_int, u_int);
-	void		 (*key)(struct window_pane *, struct client *,
+	struct screen	*(*init)(struct window_mode_entry *,
+			     struct cmd_find_state *, struct args *);
+	void		 (*free)(struct window_mode_entry *);
+	void		 (*resize)(struct window_mode_entry *, u_int, u_int);
+	void		 (*key)(struct window_mode_entry *, struct client *,
 			     struct session *, struct winlink *, key_code,
 			     struct mouse_event *);
 
-	const char	*(*key_table)(struct window_pane *);
-	void		 (*command)(struct window_pane *, struct client *,
+	const char	*(*key_table)(struct window_mode_entry *);
+	void		 (*command)(struct window_mode_entry *, struct client *,
 			     struct session *, struct winlink *, struct args *,
 			     struct mouse_event *);
+	void		 (*formats)(struct window_mode_entry *,
+			     struct format_tree *);
 };
 #define WINDOW_MODE_TIMEOUT 180
+
+/* Active window mode. */
+struct window_mode_entry {
+	struct window_pane		*wp;
+
+	const struct window_mode	*mode;
+	void				*data;
+
+	u_int				 prefix;
+};
 
 /* Child window structure. */
 struct window_pane {
@@ -780,11 +794,9 @@ struct window_pane {
 	struct grid	*saved_grid;
 	struct grid_cell saved_cell;
 
-	const struct window_mode *mode;
-	void		*modedata;
+	struct window_mode_entry *mode;
 	struct event	 modetimer;
 	time_t		 modelast;
-	u_int		 modeprefix;
 	char		*searchstr;
 
 	TAILQ_ENTRY(window_pane) entry;
@@ -2306,8 +2318,6 @@ void printflike(2, 3) window_copy_add(struct window_pane *, const char *, ...);
 void		 window_copy_vadd(struct window_pane *, const char *, va_list);
 void		 window_copy_pageup(struct window_pane *, int);
 void		 window_copy_start_drag(struct client *, struct mouse_event *);
-void		 window_copy_add_formats(struct window_pane *,
-		     struct format_tree *);
 
 /* names.c */
 void	 check_window_name(struct window *);
