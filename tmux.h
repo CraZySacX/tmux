@@ -524,6 +524,7 @@ struct msg_stderr_data {
 #define MODE_FOCUSON 0x800
 #define MODE_MOUSE_ALL 0x1000
 #define MODE_ORIGIN 0x2000
+#define MODE_CRLF 0x4000
 
 #define ALL_MODES 0xffffff
 #define ALL_MOUSE_MODES (MODE_MOUSE_STANDARD|MODE_MOUSE_BUTTON|MODE_MOUSE_ALL)
@@ -804,6 +805,7 @@ struct window_pane {
 #define PANE_EXITED 0x100
 #define PANE_STATUSREADY 0x200
 #define PANE_STATUSDRAWN 0x400
+#define PANE_EMPTY 0x800
 
 	int		 argc;
 	char	       **argv;
@@ -1054,6 +1056,12 @@ struct mouse_event {
 	u_int		sgr_b;
 };
 
+/* Key event. */
+struct key_event {
+	key_code		key;
+	struct mouse_event	m;
+};
+
 /* TTY information. */
 struct tty_key {
 	char		 ch;
@@ -1145,7 +1153,8 @@ struct tty {
 		TTY_UNKNOWN
 	} term_type;
 
-	struct mouse_event mouse;
+	u_int		 mouse_last_x;
+	u_int		 mouse_last_y;
 	int		 mouse_drag_flag;
 	void		(*mouse_drag_update)(struct client *,
 			    struct mouse_event *);
@@ -1286,7 +1295,7 @@ struct cmdq_shared {
 /* Command queue item. */
 typedef enum cmd_retval (*cmdq_cb) (struct cmdq_item *, void *);
 struct cmdq_item {
-	const char		*name;
+	char			*name;
 	struct cmdq_list	*queue;
 	struct cmdq_item	*next;
 
@@ -1593,6 +1602,7 @@ struct spawn_context {
 #define SPAWN_BEFORE 0x8
 #define SPAWN_NONOTIFY 0x10
 #define SPAWN_FULLSIZE 0x20
+#define SPAWN_EMPTY 0x40
 };
 
 /* tmux.c */
@@ -1866,7 +1876,7 @@ const char	*tty_acs_get(struct tty *, u_char);
 /* tty-keys.c */
 void		tty_keys_build(struct tty *);
 void		tty_keys_free(struct tty *);
-key_code	tty_keys_next(struct tty *);
+int		tty_keys_next(struct tty *);
 
 /* arguments.c */
 void		 args_set(struct args *, u_char, const char *);
@@ -2004,7 +2014,7 @@ void	 server_client_set_identify(struct client *, u_int);
 void	 server_client_set_key_table(struct client *, const char *);
 const char *server_client_get_key_table(struct client *);
 int	 server_client_check_nested(struct client *);
-void	 server_client_handle_key(struct client *, key_code);
+enum cmd_retval server_client_key_callback(struct cmdq_item *, void *);
 struct client *server_client_create(int);
 int	 server_client_open(struct client *, char **);
 void	 server_client_unref(struct client *);
@@ -2312,6 +2322,8 @@ void		 window_add_ref(struct window *, const char *);
 void		 window_remove_ref(struct window *, const char *);
 void		 winlink_clear_flags(struct winlink *);
 int		 winlink_shuffle_up(struct session *, struct winlink *);
+int		 window_pane_start_input(struct window_pane *,
+		     struct cmdq_item *, char **);
 
 /* layout.c */
 u_int		 layout_count_cells(struct layout_cell *);

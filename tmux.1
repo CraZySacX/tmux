@@ -14,7 +14,7 @@
 .\" IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
 .\" OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: March 25 2013 $
+.Dd $Mdocdate$
 .Dt TMUX 1
 .Os
 .Sh NAME
@@ -852,7 +852,7 @@ are the name of and shell command to execute in the initial window.
 With
 .Fl d ,
 the initial size comes from the global
-.Ar default-size
+.Ic default-size
 option;
 .Fl x
 and
@@ -865,7 +865,7 @@ If
 or
 .Fl y
 is given, the
-.Ar default-size
+.Ic default-size
 option is set for the session.
 .Pp
 If run from a terminal, any
@@ -1099,10 +1099,10 @@ to
 As a special case,
 .Fl t
 may refer to a pane (a target that contains
-.Ql : ,
-.Ql .
+.Ql \&: ,
+.Ql \&.
 or
-.Ql % )
+.Ql % ) ,
 in which case the session, window and pane are all changed.
 If
 .Fl l ,
@@ -2209,7 +2209,7 @@ is given and the selected window is already the current window,
 the command behaves like
 .Ic last-window .
 .It Xo Ic split-window
-.Op Fl bdfhvP
+.Op Fl bdfhIvP
 .Op Fl c Ar start-directory
 .Op Fl e Ar environment
 .Oo Fl l
@@ -2245,6 +2245,24 @@ option creates a new pane spanning the full window height (with
 or full window width (with
 .Fl v ) ,
 instead of splitting the active pane.
+.Pp
+An empty
+.Ar shell-command
+('') will create a pane with no command running in it.
+Output can be sent to such a pane with the
+.Ic display-message
+command.
+The
+.Fl I
+flag (if
+.Ar shell-command
+is not specified or empty)
+will create an empty pane and forward any output from stdin to it.
+For example:
+.Bd -literal -offset indent
+$ make 2>&1|tmux splitw -dI &
+.Ed
+.Pp
 All other options have the same meaning as for the
 .Ic new-window
 command.
@@ -2809,16 +2827,6 @@ The default is an empty string, which instructs
 to create a login shell using the value of the
 .Ic default-shell
 option.
-.It Ic default-size Ar XxY
-Set the default size of new windows when the
-.Ar window-size
-option is set to manual or when a session is created with
-.Ic new-session
-.Fl d .
-The value is the width and height separated by an
-.Ql x
-character.
-The default is 80x24.
 .It Ic default-shell Ar path
 Specify the default shell.
 This is used as the login shell for new windows when the
@@ -2836,9 +2844,15 @@ This option should be configured when
 .Nm
 is used as a login shell.
 .It Ic default-size Ar XxY
-Set the default size of windows when the size is not set or the
+Set the default size of new windows when the
 .Ic window-size
-option is manual.
+option is set to manual or when a session is created with
+.Ic new-session
+.Fl d .
+The value is the width and height separated by an
+.Ql x
+character.
+The default is 80x24.
 .It Xo Ic destroy-unattached
 .Op Ic on | off
 .Xc
@@ -3421,7 +3435,7 @@ see the
 .Sx STYLES
 section.
 .Pp
-.It Xo Ic Ic window-size
+.It Xo Ic window-size
 .Ar largest | Ar smallest | Ar manual
 .Xc
 Configure how
@@ -3450,21 +3464,6 @@ For how to specify
 see the
 .Sx STYLES
 section.
-.Pp
-.It Xo Ic window-size
-.Op Ic smallest | largest | manual
-.Xc
-Tell
-.Nm
-how to automatically size windows either the size of the smallest session
-containing the window, the size of the largest, or manual size.
-See also the
-.Ic resize-window
-command and the
-.Ic default-size
-and
-.Ic aggressive-resize
-options.
 .Pp
 .It Xo Ic wrap-search
 .Op Ic on | off
@@ -4454,7 +4453,7 @@ option.
 This command works only from inside
 .Nm .
 .It Xo Ic display-message
-.Op Fl apv
+.Op Fl aIpv
 .Op Fl c Ar target-client
 .Op Fl t Ar target-pane
 .Op Ar message
@@ -4481,6 +4480,10 @@ is given, otherwise the active pane for the session attached to
 prints verbose logging as the format is parsed and
 .Fl a
 lists the format variables and their values.
+.Pp
+.Fl I
+forwards any input read from stdin to the empty pane given by
+.Ar target-pane .
 .El
 .Sh BUFFERS
 .Nm
