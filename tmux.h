@@ -1170,6 +1170,7 @@ struct tty {
 
 	u_int		 mouse_last_x;
 	u_int		 mouse_last_y;
+	u_int		 mouse_last_b;
 	int		 mouse_drag_flag;
 	void		(*mouse_drag_update)(struct client *,
 			    struct mouse_event *);
@@ -2002,8 +2003,9 @@ void	 key_bindings_add(const char *, key_code, int, struct cmd_list *);
 void	 key_bindings_remove(const char *, key_code);
 void	 key_bindings_remove_table(const char *);
 void	 key_bindings_init(void);
-void	 key_bindings_dispatch(struct key_binding *, struct cmdq_item *,
-	     struct client *, struct mouse_event *, struct cmd_find_state *);
+struct cmdq_item *key_bindings_dispatch(struct key_binding *,
+	     struct cmdq_item *, struct client *, struct mouse_event *,
+	     struct cmd_find_state *);
 
 /* key-string.c */
 key_code	 key_string_lookup_string(const char *);
