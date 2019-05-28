@@ -754,12 +754,12 @@ struct screen_redraw_ctx {
 
 /* Menu. */
 struct menu_item {
-	char		*name;
-	char		*command;
+	const char	*name;
 	key_code	 key;
+	const char	*command;
 };
 struct menu {
-	char			*title;
+	const char		*title;
 	struct menu_item	*items;
 	u_int			 count;
 	u_int			 width;
@@ -1989,7 +1989,7 @@ int		 cmd_find_from_mouse(struct cmd_find_state *,
 int		 cmd_find_from_nothing(struct cmd_find_state *, int);
 
 /* cmd.c */
-void		 cmd_log_argv(int, char **, const char *);
+void printflike(3, 4) cmd_log_argv(int, char **, const char *, ...);
 void		 cmd_prepend_argv(int *, char ***, char *);
 void		 cmd_append_argv(int *, char ***, char *);
 int		 cmd_pack_argv(int, char **, char *, size_t);
@@ -2018,12 +2018,13 @@ void	    	 cmd_parse_empty(struct cmd_parse_input *);
 struct cmd_parse_result *cmd_parse_from_file(FILE *, struct cmd_parse_input *);
 struct cmd_parse_result *cmd_parse_from_string(const char *,
 		     struct cmd_parse_input *);
+struct cmd_parse_result *cmd_parse_from_arguments(int, char **,
+		     struct cmd_parse_input *);
 
 /* cmd-list.c */
 struct cmd_list	*cmd_list_new(void);
 void		 cmd_list_append(struct cmd_list *, struct cmd *);
 void		 cmd_list_move(struct cmd_list *, struct cmd_list *);
-struct cmd_list	*cmd_list_parse(int, char **, const char *, u_int, char **);
 void		 cmd_list_free(struct cmd_list *);
 char		*cmd_list_print(struct cmd_list *, int);
 
@@ -2220,6 +2221,7 @@ void	 grid_duplicate_lines(struct grid *, u_int, struct grid *, u_int,
 void	 grid_reflow(struct grid *, u_int);
 void	 grid_wrap_position(struct grid *, u_int, u_int, u_int *, u_int *);
 void	 grid_unwrap_position(struct grid *, u_int *, u_int *, u_int, u_int);
+u_int	 grid_line_length(struct grid *, u_int);
 
 /* grid-view.c */
 void	 grid_view_get_cell(struct grid *, u_int, u_int, struct grid_cell *);
@@ -2467,8 +2469,8 @@ void	 mode_tree_each_tagged(struct mode_tree_data *, mode_tree_each_cb,
 void	 mode_tree_down(struct mode_tree_data *, int);
 struct mode_tree_data *mode_tree_start(struct window_pane *, struct args *,
 	     mode_tree_build_cb, mode_tree_draw_cb, mode_tree_search_cb,
-	     mode_tree_menu_cb, void *, const char *, const char **, u_int,
-	     struct screen **);
+	     mode_tree_menu_cb, void *, const struct menu_item *, const char **,
+	     u_int, struct screen **);
 void	 mode_tree_zoom(struct mode_tree_data *, struct args *);
 void	 mode_tree_build(struct mode_tree_data *);
 void	 mode_tree_free(struct mode_tree_data *);
@@ -2584,6 +2586,7 @@ struct utf8_data *utf8_fromcstr(const char *);
 char		*utf8_tocstr(struct utf8_data *);
 u_int		 utf8_cstrwidth(const char *);
 char		*utf8_padcstr(const char *, u_int);
+int		 utf8_cstrhas(const char *, const struct utf8_data *);
 
 /* osdep-*.c */
 char		*osdep_get_name(int, char *);
@@ -2601,8 +2604,14 @@ __dead void printflike(1, 2) fatal(const char *, ...);
 __dead void printflike(1, 2) fatalx(const char *, ...);
 
 /* menu.c */
-struct menu	*menu_create(const char *, struct client *,
-		    struct cmd_find_state *, const char *);
+struct menu	*menu_create(const char *);
+void		 menu_add_items(struct menu *, const struct menu_item *,
+		    struct cmdq_item *, struct client *,
+		    struct cmd_find_state *);
+void 		 menu_add_item(struct menu *, const struct menu_item *,
+		    struct cmdq_item *, struct client *,
+		    struct cmd_find_state *);
+
 void		 menu_free(struct menu *);
 int		 menu_display(struct menu *, int, struct cmdq_item *, u_int,
 		    u_int, struct client *, struct cmd_find_state *,

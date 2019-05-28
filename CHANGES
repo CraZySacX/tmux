@@ -1,4 +1,17 @@
-CHANGES FROM 2.9 to X.X
+CHANGES FROM 3.0 to X.X
+
+XXX
+
+CHANGES FROM 2.9 to 3.0
+
+* Add an addition form of string syntax in the configuration file - {}. This
+  means commands that take other commands as string arguments can be expressed
+  more clearly and without additional escaping. This means that a literal { and
+  } must now be escaped or quoted.
+
+* New <, >, <= and >= comparison operators for formats.
+
+* Improve escaping of special characters in list-keys output.
 
 * INCOMPATIBLE: tmux's configuration parsing has changed to use yacc(1). Most
   configuration files shouldn't need to be changed but there are the following
@@ -20,10 +33,10 @@ CHANGES FROM 2.9 to X.X
 * Add support for the overline attribute (SGR 53). The Smol capability is
   needed in terminal-overrides.
 
-* Add the ability to create simple menus. Introduces new command display-menu
-  and a few new formats (client_menu, session_menu, window_menu,
-  pane_menu). Default menus are bound to MouseDown3 on the status line,
-  M-MouseDown3 on panes and MouseDown3 in tree, client and buffer modes.
+* Add the ability to create simple menus. Introduces new command
+  display-menu. Default menus are bound to MouseDown3 on the status line;
+  MouseDown3 or M-MouseDown3 on panes; MouseDown3 in tree, client and
+  buffer modes; and C-b C-m and C-b M-m.
 
 * Allow panes to be empty (no command). They can be created either by piping to
   split-window -I, or by passing an empty command ('') to split-window. Output
