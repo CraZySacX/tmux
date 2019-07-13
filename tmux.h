@@ -113,9 +113,10 @@ struct winlink;
 #define KEYC_CTRL 0x400000000000ULL
 #define KEYC_SHIFT 0x800000000000ULL
 #define KEYC_XTERM 0x1000000000000ULL
+#define KEYC_LITERAL 0x2000000000000ULL
 
 /* Mask to obtain key w/o modifiers. */
-#define KEYC_MASK_MOD (KEYC_ESCAPE|KEYC_CTRL|KEYC_SHIFT|KEYC_XTERM)
+#define KEYC_MASK_MOD (KEYC_ESCAPE|KEYC_CTRL|KEYC_SHIFT|KEYC_XTERM|KEYC_LITERAL)
 #define KEYC_MASK_KEY (~KEYC_MASK_MOD)
 
 /* Is this a mouse key? */
@@ -598,13 +599,13 @@ enum utf8_state {
 
 /* Grid cell data. */
 struct grid_cell {
-	u_char			flags;
+	struct utf8_data	data; /* 21 bytes */
 	u_short			attr;
+	u_char			flags;
 	int			fg;
 	int			bg;
 	int			us;
-	struct utf8_data	data;
-};
+} __packed;
 struct grid_cell_entry {
 	u_char			flags;
 	union {
@@ -1517,6 +1518,7 @@ struct client {
 #define CLIENT_STATUSOFF 0x800000
 #define CLIENT_REDRAWSTATUSALWAYS 0x1000000
 #define CLIENT_REDRAWOVERLAY 0x2000000
+#define CLIENT_CONTROL_NOOUTPUT 0x4000000
 #define CLIENT_ALLREDRAWFLAGS		\
 	(CLIENT_REDRAWWINDOW|		\
 	 CLIENT_REDRAWSTATUS|		\
