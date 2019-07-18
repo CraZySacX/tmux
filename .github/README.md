@@ -30,7 +30,8 @@ configure with `--enable-utempter` to enable this.
 
 ### From version control
 
-To get and build the latest from version control:
+To get and build the latest from version control - note that this requires
+`autoconf`, `automake` and `pkg-config`:
 
 ~~~bash
 git clone https://github.com/tmux/tmux.git
@@ -38,10 +39,6 @@ cd tmux
 sh autogen.sh
 ./configure && make
 ~~~
-
-(Note that this requires at least a working C compiler, `make`, `autoconf`,
-`automake`, `pkg-config` as well as `libevent` and `ncurses` libraries and
-headers.)
 
 ## Contributing
 
