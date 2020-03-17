@@ -398,6 +398,8 @@ server_client_exec(struct client *c, const char *cmd)
 		shell = options_get_string(s->options, "default-shell");
 	else
 		shell = options_get_string(global_s_options, "default-shell");
+	if (!checkshell(shell))
+		shell = _PATH_BSHELL;
 	shellsize = strlen(shell) + 1;
 
 	msg = xmalloc(cmdsize + shellsize);
@@ -417,6 +419,7 @@ server_client_check_mouse(struct client *c, struct key_event *event)
 	struct winlink		*wl;
 	struct window_pane	*wp;
 	u_int			 x, y, b, sx, sy, px, py;
+	int			 ignore = 0;
 	key_code		 key;
 	struct timeval		 tv;
 	struct style_range	*sr;
@@ -443,6 +446,7 @@ server_client_check_mouse(struct client *c, struct key_event *event)
 	if (event->key == KEYC_DOUBLECLICK) {
 		type = DOUBLE;
 		x = m->x, y = m->y, b = m->b;
+		ignore = 1;
 		log_debug("double-click at %u,%u", x, y);
 	} else if ((m->sgr_type != ' ' &&
 	    MOUSE_DRAG(m->sgr_b) &&
@@ -489,16 +493,17 @@ server_client_check_mouse(struct client *c, struct key_event *event)
 				type = TRIPLE;
 				x = m->x, y = m->y, b = m->b;
 				log_debug("triple-click at %u,%u", x, y);
+				ignore = 1;
 				goto have_event;
 			}
-		}
+		} else
+			c->flags |= CLIENT_DOUBLECLICK;
 
+	add_timer:
 		type = DOWN;
 		x = m->x, y = m->y, b = m->b;
 		log_debug("down at %u,%u", x, y);
-		c->flags |= CLIENT_DOUBLECLICK;
 
-	add_timer:
 		if (KEYC_CLICK_TIMEOUT != 0) {
 			memcpy(&c->click_event, m, sizeof c->click_event);
 			c->click_button = m->b;
@@ -517,6 +522,7 @@ have_event:
 	/* Save the session. */
 	m->s = s->id;
 	m->w = -1;
+	m->ignore = ignore;
 
 	/* Is this on the status line? */
 	m->statusat = status_at_line(c);
@@ -2007,7 +2013,7 @@ server_client_dispatch_shell(struct client *c)
 	const char	*shell;
 
 	shell = options_get_string(global_s_options, "default-shell");
-	if (*shell == '\0' || areshell(shell))
+	if (!checkshell(shell))
 		shell = _PATH_BSHELL;
 	proc_send(c->peer, MSG_SHELL, -1, shell, strlen(shell) + 1);
 
