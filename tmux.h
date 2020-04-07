@@ -763,6 +763,7 @@ struct screen {
 	u_int			 saved_cy;
 	struct grid		*saved_grid;
 	struct grid_cell	 saved_cell;
+	int			 saved_flags;
 
 	bitstr_t		*tabs;
 	struct screen_sel	*sel;
@@ -906,7 +907,6 @@ struct window_pane {
 
 	int		 fd;
 	struct bufferevent *event;
-	u_int		 disabled;
 
 	struct event	 resize_timer;
 
@@ -927,8 +927,6 @@ struct window_pane {
 	size_t		 status_size;
 
 	TAILQ_HEAD (, window_mode_entry) modes;
-	struct event	 modetimer;
-	time_t		 modelast;
 
 	char		*searchstr;
 	int		 searchregex;
