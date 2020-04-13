@@ -47,7 +47,9 @@ const struct cmd_entry cmd_switch_client_entry = {
 static enum cmd_retval
 cmd_switch_client_exec(struct cmd *self, struct cmdq_item *item)
 {
-	struct args		*args = self->args;
+	struct args		*args = cmd_get_args(self);
+	struct cmd_find_state	*current = cmdq_get_current(item);
+	struct cmd_find_state	 target;
 	const char		*tflag = args_get(args, 't');
 	enum cmd_find_type	 type;
 	int			 flags;
@@ -69,11 +71,11 @@ cmd_switch_client_exec(struct cmd *self, struct cmdq_item *item)
 		type = CMD_FIND_SESSION;
 		flags = CMD_FIND_PREFER_UNATTACHED;
 	}
-	if (cmd_find_target(&item->target, item, tflag, type, flags) != 0)
+	if (cmd_find_target(&target, item, tflag, type, flags) != 0)
 		return (CMD_RETURN_ERROR);
-	s = item->target.s;
-	wl = item->target.wl;
-	wp = item->target.wp;
+	s = target.s;
+	wl = target.wl;
+	wp = target.wp;
 
 	if (args_has(args, 'r'))
 		c->flags ^= CLIENT_READONLY;
@@ -111,11 +113,11 @@ cmd_switch_client_exec(struct cmd *self, struct cmdq_item *item)
 			return (CMD_RETURN_ERROR);
 		}
 	} else {
-		if (item->client == NULL)
+		if (cmdq_get_client(item) == NULL)
 			return (CMD_RETURN_NORMAL);
 		if (wl != NULL && wp != NULL) {
 			w = wl->window;
-			if (window_push_zoom(w, args_has(self->args, 'Z')))
+			if (window_push_zoom(w, args_has(args, 'Z')))
 				server_redraw_window(w);
 			window_redraw_active_switch(w, wp);
 			window_set_active_pane(w, wp, 1);
@@ -124,7 +126,7 @@ cmd_switch_client_exec(struct cmd *self, struct cmdq_item *item)
 		}
 		if (wl != NULL) {
 			session_set_current(s, wl);
-			cmd_find_from_session(&item->shared->current, s, 0);
+			cmd_find_from_session(current, s, 0);
 		}
 	}
 
@@ -134,7 +136,7 @@ cmd_switch_client_exec(struct cmd *self, struct cmdq_item *item)
 	if (c->session != NULL && c->session != s)
 		c->last_session = c->session;
 	c->session = s;
-	if (~item->shared->flags & CMDQ_SHARED_REPEAT)
+	if (~cmdq_get_flags(item) & CMDQ_STATE_REPEAT)
 		server_client_set_key_table(c, NULL);
 	tty_update_client_offset(c);
 	status_timer_start(c);

@@ -51,13 +51,14 @@ const struct cmd_entry cmd_new_window_entry = {
 static enum cmd_retval
 cmd_new_window_exec(struct cmd *self, struct cmdq_item *item)
 {
-	struct args		*args = self->args;
-	struct cmd_find_state	*current = &item->shared->current;
+	struct args		*args = cmd_get_args(self);
+	struct cmd_find_state	*current = cmdq_get_current(item);
+	struct cmd_find_state	*target = cmdq_get_target(item);
 	struct spawn_context	 sc;
 	struct client		*c = cmd_find_client(item, NULL, 1);
-	struct session		*s = item->target.s;
-	struct winlink		*wl = item->target.wl;
-	int			 idx = item->target.idx;
+	struct session		*s = target->s;
+	struct winlink		*wl = target->wl;
+	int			 idx = target->idx;
 	struct winlink		*new_wl;
 	char			*cause = NULL, *cp;
 	const char		*template, *add;

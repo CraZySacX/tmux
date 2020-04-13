@@ -64,7 +64,7 @@ struct cmd_command_prompt_cdata {
 static enum cmd_retval
 cmd_command_prompt_exec(struct cmd *self, struct cmdq_item *item)
 {
-	struct args			*args = self->args;
+	struct args			*args = cmd_get_args(self);
 	const char			*inputs, *prompts;
 	struct cmd_command_prompt_cdata	*cdata;
 	struct client			*c;
@@ -177,7 +177,7 @@ cmd_command_prompt_callback(struct client *c, void *data, const char *s,
 		cmdq_append(c, new_item);
 		break;
 	case CMD_PARSE_SUCCESS:
-		new_item = cmdq_get_command(pr->cmdlist, NULL, NULL, 0);
+		new_item = cmdq_get_command(pr->cmdlist, NULL);
 		cmd_list_free(pr->cmdlist);
 		cmdq_append(c, new_item);
 		break;

@@ -48,16 +48,18 @@ const struct cmd_entry cmd_break_pane_entry = {
 static enum cmd_retval
 cmd_break_pane_exec(struct cmd *self, struct cmdq_item *item)
 {
-	struct args		*args = self->args;
-	struct cmd_find_state	*current = &item->shared->current;
+	struct args		*args = cmd_get_args(self);
+	struct cmd_find_state	*current = cmdq_get_current(item);
+	struct cmd_find_state	*target = cmdq_get_target(item);
+	struct cmd_find_state	*source = cmdq_get_source(item);
 	struct client		*c = cmd_find_client(item, NULL, 1);
-	struct winlink		*wl = item->source.wl;
-	struct session		*src_s = item->source.s;
-	struct session		*dst_s = item->target.s;
-	struct window_pane	*wp = item->source.wp;
+	struct winlink		*wl = source->wl;
+	struct session		*src_s = source->s;
+	struct session		*dst_s = target->s;
+	struct window_pane	*wp = source->wp;
 	struct window		*w = wl->window;
 	char			*name, *cause;
-	int			 idx = item->target.idx;
+	int			 idx = target->idx;
 	const char		*template;
 	char			*cp;
 
@@ -98,7 +100,7 @@ cmd_break_pane_exec(struct cmd *self, struct cmdq_item *item)
 	if (idx == -1)
 		idx = -1 - options_get_number(dst_s->options, "base-index");
 	wl = session_attach(dst_s, w, idx, &cause); /* can't fail */
-	if (!args_has(self->args, 'd')) {
+	if (!args_has(args, 'd')) {
 		session_select(dst_s, wl->idx);
 		cmd_find_from_session(current, dst_s, 0);
 	}

@@ -208,7 +208,7 @@ server_client_create(int fd)
 	c->fd = -1;
 	c->cwd = NULL;
 
-	TAILQ_INIT(&c->queue);
+	c->queue = cmdq_new();
 
 	c->tty.fd = -1;
 	c->title = NULL;
@@ -353,8 +353,7 @@ server_client_free(__unused int fd, __unused short events, void *arg)
 
 	log_debug("free client %p (%d references)", c, c->references);
 
-	if (!TAILQ_EMPTY(&c->queue))
-		fatalx("queue not empty");
+	cmdq_free(c->queue);
 
 	if (c->references == 0) {
 		free((void *)c->name);
@@ -1080,7 +1079,7 @@ server_client_update_latest(struct client *c)
 static enum cmd_retval
 server_client_key_callback(struct cmdq_item *item, void *data)
 {
-	struct client			*c = item->client;
+	struct client			*c = cmdq_get_client(item);
 	struct key_event		*event = data;
 	key_code			 key = event->key;
 	struct mouse_event		*m = &event->m;
@@ -1222,7 +1221,7 @@ try_again:
 		server_status_client(c);
 
 		/* Execute the key binding. */
-		key_bindings_dispatch(bd, item, c, m, &fs);
+		key_bindings_dispatch(bd, item, c, event, &fs);
 		key_bindings_unref_table(table);
 		goto out;
 	}
@@ -1891,7 +1890,7 @@ server_client_dispatch(struct imsg *imsg, void *arg)
 static enum cmd_retval
 server_client_command_done(struct cmdq_item *item, __unused void *data)
 {
-	struct client	*c = item->client;
+	struct client	*c = cmdq_get_client(item);
 
 	if (~c->flags & CLIENT_ATTACHED)
 		c->flags |= CLIENT_EXIT;
@@ -1948,7 +1947,7 @@ server_client_dispatch_command(struct client *c, struct imsg *imsg)
 	}
 	cmd_free_argv(argc, argv);
 
-	cmdq_append(c, cmdq_get_command(pr->cmdlist, NULL, NULL, 0));
+	cmdq_append(c, cmdq_get_command(pr->cmdlist, NULL));
 	cmdq_append(c, cmdq_get_callback(server_client_command_done, NULL));
 
 	cmd_list_free(pr->cmdlist);

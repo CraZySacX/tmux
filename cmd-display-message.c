@@ -60,11 +60,12 @@ cmd_display_message_each(const char *key, const char *value, void *arg)
 static enum cmd_retval
 cmd_display_message_exec(struct cmd *self, struct cmdq_item *item)
 {
-	struct args		*args = self->args;
+	struct args		*args = cmd_get_args(self);
+	struct cmd_find_state	*target = cmdq_get_target(item);
 	struct client		*c, *target_c;
-	struct session		*s = item->target.s;
-	struct winlink		*wl = item->target.wl;
-	struct window_pane	*wp = item->target.wp;
+	struct session		*s = target->s;
+	struct winlink		*wl = target->wl;
+	struct window_pane	*wp = target->wp;
 	const char		*template;
 	char			*msg, *cause;
 	struct format_tree	*ft;
@@ -101,11 +102,11 @@ cmd_display_message_exec(struct cmd *self, struct cmdq_item *item)
 		target_c = c;
 	else
 		target_c = cmd_find_best_client(s);
-	if (args_has(self->args, 'v'))
+	if (args_has(args, 'v'))
 		flags = FORMAT_VERBOSE;
 	else
 		flags = 0;
-	ft = format_create(item->client, item, FORMAT_NONE, flags);
+	ft = format_create(cmdq_get_client(item), item, FORMAT_NONE, flags);
 	format_defaults(ft, target_c, s, wl, wp);
 
 	if (args_has(args, 'a')) {
@@ -114,7 +115,7 @@ cmd_display_message_exec(struct cmd *self, struct cmdq_item *item)
 	}
 
 	msg = format_expand_time(ft, template);
-	if (args_has(self->args, 'p'))
+	if (args_has(args, 'p'))
 		cmdq_print(item, "%s", msg);
 	else if (c != NULL)
 		status_message_set(c, "%s", msg);

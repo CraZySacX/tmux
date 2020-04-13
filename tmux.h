@@ -41,9 +41,12 @@ extern char   **environ;
 struct args;
 struct args_value;
 struct client;
+struct cmd;
 struct cmd_find_state;
 struct cmdq_item;
 struct cmdq_list;
+struct cmdq_state;
+struct cmds;
 struct environ;
 struct format_job_tree;
 struct format_tree;
@@ -52,8 +55,8 @@ struct job;
 struct mode_tree_data;
 struct mouse_event;
 struct options;
-struct options_entry;
 struct options_array_item;
+struct options_entry;
 struct session;
 struct tmuxpeer;
 struct tmuxproc;
@@ -845,11 +848,11 @@ struct window_mode {
 	void		 (*formats)(struct window_mode_entry *,
 			     struct format_tree *);
 };
-#define WINDOW_MODE_TIMEOUT 180
 
 /* Active window mode. */
 struct window_mode_entry {
 	struct window_pane		*wp;
+	struct window_pane		*swp;
 
 	const struct window_mode	*mode;
 	void				*data;
@@ -1337,27 +1340,11 @@ struct cmd_find_state {
 #define CMD_FIND_EXACT_WINDOW 0x20
 #define CMD_FIND_CANFAIL 0x40
 
-/* Command and list of commands. */
-struct cmd {
-	const struct cmd_entry	 *entry;
-	struct args		 *args;
-	u_int			  group;
-
-	char			 *file;
-	u_int			  line;
-
-	char			 *alias;
-	int			  argc;
-	char			**argv;
-
-	TAILQ_ENTRY(cmd)	  qentry;
-};
-TAILQ_HEAD(cmds, cmd);
-
+/* List of commands. */
 struct cmd_list {
-	int		references;
-	u_int		group;
-	struct cmds	list;
+	int		 references;
+	u_int		 group;
+	struct cmds	*list;
 };
 
 /* Command return values. */
@@ -1385,6 +1372,7 @@ struct cmd_parse_input {
 #define CMD_PARSE_PARSEONLY 0x2
 #define CMD_PARSE_NOALIAS 0x4
 #define CMD_PARSE_VERBOSE 0x8
+#define CMD_PARSE_ONEGROUP 0x10
 
 	const char		*file;
 	u_int			 line;
@@ -1394,59 +1382,13 @@ struct cmd_parse_input {
 	struct cmd_find_state	 fs;
 };
 
-/* Command queue item type. */
-enum cmdq_type {
-	CMDQ_COMMAND,
-	CMDQ_CALLBACK,
-};
+/* Command queue flags. */
+#define CMDQ_STATE_REPEAT 0x1
+#define CMDQ_STATE_CONTROL 0x2
+#define CMDQ_STATE_NOHOOKS 0x4
 
-/* Command queue item shared state. */
-struct cmdq_shared {
-	int			 references;
-
-	int			 flags;
-#define CMDQ_SHARED_REPEAT 0x1
-#define CMDQ_SHARED_CONTROL 0x2
-
-	struct format_tree	*formats;
-
-	struct mouse_event	 mouse;
-	struct cmd_find_state	 current;
-};
-
-/* Command queue item. */
+/* Command queue callback. */
 typedef enum cmd_retval (*cmdq_cb) (struct cmdq_item *, void *);
-struct cmdq_item {
-	char			*name;
-	struct cmdq_list	*queue;
-	struct cmdq_item	*next;
-
-	struct client		*client;
-
-	enum cmdq_type		 type;
-	u_int			 group;
-
-	u_int			 number;
-	time_t			 time;
-
-	int			 flags;
-#define CMDQ_FIRED 0x1
-#define CMDQ_WAITING 0x2
-#define CMDQ_NOHOOKS 0x4
-
-	struct cmdq_shared	*shared;
-	struct cmd_find_state	 source;
-	struct cmd_find_state	 target;
-
-	struct cmd_list		*cmdlist;
-	struct cmd		*cmd;
-
-	cmdq_cb			 cb;
-	void			*data;
-
-	TAILQ_ENTRY(cmdq_item)	 entry;
-};
-TAILQ_HEAD(cmdq_list, cmdq_item);
 
 /* Command definition flag. */
 struct cmd_entry_flag {
@@ -1529,7 +1471,7 @@ typedef void (*overlay_free_cb)(struct client *);
 struct client {
 	const char	*name;
 	struct tmuxpeer	*peer;
-	struct cmdq_list queue;
+	struct cmdq_list *queue;
 
 	pid_t		 pid;
 	int		 fd;
@@ -1843,6 +1785,7 @@ int		 format_true(const char *);
 struct format_tree *format_create(struct client *, struct cmdq_item *, int,
 		     int);
 void		 format_free(struct format_tree *);
+void		 format_merge(struct format_tree *, struct format_tree *);
 void printflike(3, 4) format_add(struct format_tree *, const char *,
 		     const char *, ...);
 void		 format_each(struct format_tree *, void (*)(const char *,
@@ -1852,6 +1795,8 @@ char		*format_expand(struct format_tree *, const char *);
 char		*format_single(struct cmdq_item *, const char *,
 		     struct client *, struct session *, struct winlink *,
 		     struct window_pane *);
+char		*format_single_from_target(struct cmdq_item *, const char *,
+		     struct client *);
 void		 format_defaults(struct format_tree *, struct client *,
 		     struct session *, struct winlink *, struct window_pane *);
 void		 format_defaults_window(struct format_tree *, struct window *);
@@ -2104,6 +2049,7 @@ int		 cmd_find_from_mouse(struct cmd_find_state *,
 int		 cmd_find_from_nothing(struct cmd_find_state *, int);
 
 /* cmd.c */
+extern const struct cmd_entry *cmd_table[];
 void printflike(3, 4) cmd_log_argv(int, char **, const char *, ...);
 void		 cmd_prepend_argv(int *, char ***, char *);
 void		 cmd_append_argv(int *, char ***, char *);
@@ -2113,16 +2059,28 @@ char	       **cmd_copy_argv(int, char **);
 void		 cmd_free_argv(int, char **);
 char		*cmd_stringify_argv(int, char **);
 char		*cmd_get_alias(const char *);
+const struct cmd_entry *cmd_get_entry(struct cmd *);
+struct args	*cmd_get_args(struct cmd *);
+u_int		 cmd_get_group(struct cmd *);
+void		 cmd_get_source(struct cmd *, const char **, u_int *);
 struct cmd	*cmd_parse(int, char **, const char *, u_int, char **);
 void		 cmd_free(struct cmd *);
 char		*cmd_print(struct cmd *);
+struct cmd_list	*cmd_list_new(void);
+void		 cmd_list_append(struct cmd_list *, struct cmd *);
+void		 cmd_list_move(struct cmd_list *, struct cmd_list *);
+void		 cmd_list_free(struct cmd_list *);
+char		*cmd_list_print(struct cmd_list *, int);
+struct cmd	*cmd_list_first(struct cmd_list *);
+struct cmd	*cmd_list_next(struct cmd *);
+int		 cmd_list_all_have(struct cmd_list *, int);
+int		 cmd_list_any_have(struct cmd_list *, int);
 int		 cmd_mouse_at(struct window_pane *, struct mouse_event *,
 		     u_int *, u_int *, int);
 struct winlink	*cmd_mouse_window(struct mouse_event *, struct session **);
 struct window_pane *cmd_mouse_pane(struct mouse_event *, struct session **,
 		     struct winlink **);
 char		*cmd_template_replace(const char *, const char *, int);
-extern const struct cmd_entry *cmd_table[];
 
 /* cmd-attach-session.c */
 enum cmd_retval	 cmd_attach_session(struct cmdq_item *, const char *, int, int,
@@ -2138,16 +2096,26 @@ struct cmd_parse_result *cmd_parse_from_buffer(const void *, size_t,
 struct cmd_parse_result *cmd_parse_from_arguments(int, char **,
 		     struct cmd_parse_input *);
 
-/* cmd-list.c */
-struct cmd_list	*cmd_list_new(void);
-void		 cmd_list_append(struct cmd_list *, struct cmd *);
-void		 cmd_list_move(struct cmd_list *, struct cmd_list *);
-void		 cmd_list_free(struct cmd_list *);
-char		*cmd_list_print(struct cmd_list *, int);
-
 /* cmd-queue.c */
-struct cmdq_item *cmdq_get_command(struct cmd_list *, struct cmd_find_state *,
-		     struct mouse_event *, int);
+struct cmdq_state *cmdq_new_state(struct cmd_find_state *, struct key_event *,
+		     int);
+struct cmdq_state *cmdq_link_state(struct cmdq_state *);
+struct cmdq_state *cmdq_copy_state(struct cmdq_state *);
+void		  cmdq_free_state(struct cmdq_state *);
+void printflike(3, 4) cmdq_add_format(struct cmdq_state *, const char *,
+		     const char *, ...);
+void		  cmdq_merge_formats(struct cmdq_item *, struct format_tree *);
+struct cmdq_list *cmdq_new(void);
+void cmdq_free(struct cmdq_list *);
+const char	 *cmdq_get_name(struct cmdq_item *);
+struct client	 *cmdq_get_client(struct cmdq_item *);
+struct cmdq_state *cmdq_get_state(struct cmdq_item *);
+struct cmd_find_state *cmdq_get_target(struct cmdq_item *);
+struct cmd_find_state *cmdq_get_source(struct cmdq_item *);
+struct key_event *cmdq_get_event(struct cmdq_item *);
+struct cmd_find_state *cmdq_get_current(struct cmdq_item *);
+int		  cmdq_get_flags(struct cmdq_item *);
+struct cmdq_item *cmdq_get_command(struct cmd_list *, struct cmdq_state *);
 #define cmdq_get_callback(cb, data) cmdq_get_callback1(#cb, cb, data)
 struct cmdq_item *cmdq_get_callback1(const char *, cmdq_cb, void *);
 struct cmdq_item *cmdq_get_error(const char *);
@@ -2156,8 +2124,6 @@ struct cmdq_item *cmdq_append(struct client *, struct cmdq_item *);
 void		 cmdq_insert_hook(struct session *, struct cmdq_item *,
 		     struct cmd_find_state *, const char *, ...);
 void		 cmdq_continue(struct cmdq_item *);
-void printflike(3, 4) cmdq_format(struct cmdq_item *, const char *,
-		     const char *, ...);
 u_int		 cmdq_next(struct client *);
 void		 cmdq_guard(struct cmdq_item *, const char *, int);
 void printflike(2, 3) cmdq_print(struct cmdq_item *, const char *, ...);
@@ -2183,7 +2149,7 @@ void	 key_bindings_remove(const char *, key_code);
 void	 key_bindings_remove_table(const char *);
 void	 key_bindings_init(void);
 struct cmdq_item *key_bindings_dispatch(struct key_binding *,
-	     struct cmdq_item *, struct client *, struct mouse_event *,
+	     struct cmdq_item *, struct client *, struct key_event *,
 	     struct cmd_find_state *);
 
 /* key-string.c */
@@ -2539,8 +2505,8 @@ void		 window_pane_unset_palette(struct window_pane *, u_int);
 void		 window_pane_reset_palette(struct window_pane *);
 int		 window_pane_get_palette(struct window_pane *, int);
 int		 window_pane_set_mode(struct window_pane *,
-		     const struct window_mode *, struct cmd_find_state *,
-		     struct args *);
+		     struct window_pane *, const struct window_mode *,
+		     struct cmd_find_state *, struct args *);
 void		 window_pane_reset_mode(struct window_pane *);
 void		 window_pane_reset_mode_all(struct window_pane *);
 int		 window_pane_key(struct window_pane *, struct client *,

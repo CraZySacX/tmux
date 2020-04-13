@@ -1108,8 +1108,8 @@ format_cb_mouse_line(struct format_tree *ft, struct format_entry *fe)
 		fe->value = s;
 }
 
-/* Merge a format tree. */
-static void
+/* Merge one format tree into another. */
+void
 format_merge(struct format_tree *ft, struct format_tree *from)
 {
 	struct format_entry	*fe;
@@ -1124,19 +1124,13 @@ format_merge(struct format_tree *ft, struct format_tree *from)
 static void
 format_create_add_item(struct format_tree *ft, struct cmdq_item *item)
 {
-	struct mouse_event	*m;
+	struct key_event	*event = cmdq_get_event(item);
+	struct mouse_event	*m = &event->m;
 	struct window_pane	*wp;
 	u_int			 x, y;
 
-	if (item->cmd != NULL)
-		format_add(ft, "command", "%s", item->cmd->entry->name);
+	cmdq_merge_formats(item, ft);
 
-	if (item->shared == NULL)
-		return;
-	if (item->shared->formats != NULL)
-		format_merge(ft, item->shared->formats);
-
-	m = &item->shared->mouse;
 	if (m->valid && ((wp = cmd_mouse_pane(m, NULL, NULL)) != NULL)) {
 		format_add(ft, "mouse_pane", "%%%u", wp->id);
 		if (cmd_mouse_at(wp, m, &x, &y, 0) == 0) {
@@ -1617,7 +1611,7 @@ format_build_modifiers(struct format_tree *ft, const char **s, u_int *count)
 		return (NULL);
 	}
 	*s = cp + 1;
-	return list;
+	return (list);
 }
 
 /* Match against an fnmatch(3) pattern or regular expression. */
@@ -1909,7 +1903,7 @@ format_replace_expression(struct format_modifier *mexp, struct format_tree *ft,
 
 	free(right);
 	free(left);
-	return value;
+	return (value);
 
 fail:
 	free(right);
@@ -2423,7 +2417,7 @@ format_single(struct cmdq_item *item, const char *fmt, struct client *c,
 	char			*expanded;
 
 	if (item != NULL)
-		ft = format_create(item->client, item, FORMAT_NONE, 0);
+		ft = format_create(cmdq_get_client(item), item, FORMAT_NONE, 0);
 	else
 		ft = format_create(NULL, item, FORMAT_NONE, 0);
 	format_defaults(ft, c, s, wl, wp);
@@ -2431,6 +2425,16 @@ format_single(struct cmdq_item *item, const char *fmt, struct client *c,
 	expanded = format_expand(ft, fmt);
 	format_free(ft);
 	return (expanded);
+}
+
+/* Expand a single string using target. */
+char *
+format_single_from_target(struct cmdq_item *item, const char *fmt,
+    struct client *c)
+{
+	struct cmd_find_state	*target = cmdq_get_target(item);
+
+	return (format_single(item, fmt, c, target->s, target->wl, target->wp));
 }
 
 /* Set defaults for any of arguments that are not NULL. */

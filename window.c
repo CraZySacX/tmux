@@ -1077,8 +1077,9 @@ window_pane_get_palette(struct window_pane *wp, int c)
 }
 
 int
-window_pane_set_mode(struct window_pane *wp, const struct window_mode *mode,
-    struct cmd_find_state *fs, struct args *args)
+window_pane_set_mode(struct window_pane *wp, struct window_pane *swp,
+    const struct window_mode *mode, struct cmd_find_state *fs,
+    struct args *args)
 {
 	struct window_mode_entry	*wme;
 
@@ -1095,6 +1096,7 @@ window_pane_set_mode(struct window_pane *wp, const struct window_mode *mode,
 	} else {
 		wme = xcalloc(1, sizeof *wme);
 		wme->wp = wp;
+		wme->swp = swp;
 		wme->mode = mode;
 		wme->prefix = 1;
 		TAILQ_INSERT_HEAD(&wp->modes, wme, entry);
@@ -1544,7 +1546,7 @@ int
 window_pane_start_input(struct window_pane *wp, struct cmdq_item *item,
     char **cause)
 {
-	struct client			*c = item->client;
+	struct client			*c = cmdq_get_client(item);
 	struct window_pane_input_data	*cdata;
 
 	if (~wp->flags & PANE_EMPTY) {
