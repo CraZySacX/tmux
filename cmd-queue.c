@@ -42,6 +42,7 @@ struct cmdq_item {
 	struct cmdq_item	*next;
 
 	struct client		*client;
+	struct client		*target_client;
 
 	enum cmdq_type		 type;
 	u_int			 group;
@@ -63,7 +64,7 @@ struct cmdq_item {
 
 	TAILQ_ENTRY(cmdq_item)	 entry;
 };
-TAILQ_HEAD(cmdq_list, cmdq_item);
+TAILQ_HEAD(cmdq_item_list, cmdq_item);
 
 /*
  * Command queue state. This is the context for commands on the command queue.
@@ -80,6 +81,12 @@ struct cmdq_state {
 
 	struct key_event	 event;
 	struct cmd_find_state	 current;
+};
+
+/* Command queue. */
+struct cmdq_list {
+	struct cmdq_item	*item;
+	struct cmdq_item_list	 list;
 };
 
 /* Get command queue name. */
@@ -118,7 +125,7 @@ cmdq_new(void)
 	struct cmdq_list	*queue;
 
 	queue = xcalloc (1, sizeof *queue);
-	TAILQ_INIT (queue);
+	TAILQ_INIT (&queue->list);
 	return (queue);
 }
 
@@ -126,7 +133,7 @@ cmdq_new(void)
 void
 cmdq_free(struct cmdq_list *queue)
 {
-	if (!TAILQ_EMPTY(queue))
+	if (!TAILQ_EMPTY(&queue->list))
 		fatalx("queue not empty");
 	free(queue);
 }
@@ -143,6 +150,13 @@ struct client *
 cmdq_get_client(struct cmdq_item *item)
 {
 	return (item->client);
+}
+
+/* Get item target client. */
+struct client *
+cmdq_get_target_client(struct cmdq_item *item)
+{
+	return (item->target_client);
 }
 
 /* Get item state. */
@@ -281,12 +295,12 @@ cmdq_append(struct client *c, struct cmdq_item *item)
 		item->client = c;
 
 		item->queue = queue;
-		TAILQ_INSERT_TAIL(queue, item, entry);
+		TAILQ_INSERT_TAIL(&queue->list, item, entry);
 		log_debug("%s %s: %s", __func__, cmdq_name(c), item->name);
 
 		item = next;
 	} while (item != NULL);
-	return (TAILQ_LAST(queue, cmdq_list));
+	return (TAILQ_LAST(&queue->list, cmdq_item_list));
 }
 
 /* Insert an item. */
@@ -307,7 +321,7 @@ cmdq_insert_after(struct cmdq_item *after, struct cmdq_item *item)
 		item->client = c;
 
 		item->queue = queue;
-		TAILQ_INSERT_AFTER(queue, after, item, entry);
+		TAILQ_INSERT_AFTER(&queue->list, after, item, entry);
 		log_debug("%s %s: %s after %s", __func__, cmdq_name(c),
 		    item->name, after->name);
 
@@ -391,7 +405,7 @@ cmdq_remove(struct cmdq_item *item)
 		cmd_list_free(item->cmdlist);
 	cmdq_free_state(item->state);
 
-	TAILQ_REMOVE(item->queue, item, entry);
+	TAILQ_REMOVE(&item->queue->list, item, entry);
 
 	free(item->name);
 	free(item);
@@ -483,14 +497,15 @@ cmdq_find_flag(struct cmdq_item *item, struct cmd_find_state *fs,
 static enum cmd_retval
 cmdq_fire_command(struct cmdq_item *item)
 {
-	struct client		*c = item->client;
-	const char		*name = cmdq_name(c);
+	const char		*name = cmdq_name(item->client);
 	struct cmdq_state	*state = item->state;
 	struct cmd		*cmd = item->cmd;
+	struct args		*args = cmd_get_args(cmd);
 	const struct cmd_entry	*entry = cmd_get_entry(cmd);
+	struct client		*tc, *saved = item->client;
 	enum cmd_retval		 retval;
 	struct cmd_find_state	*fsp, fs;
-	int			 flags;
+	int			 flags, quiet = 0;
 	char			*tmp;
 
 	if (log_get_level() > 1) {
@@ -504,12 +519,32 @@ cmdq_fire_command(struct cmdq_item *item)
 
 	if (item->client == NULL)
 		item->client = cmd_find_client(item, NULL, 1);
+
+	if (entry->flags & CMD_CLIENT_CANFAIL)
+		quiet = 1;
+	if (entry->flags & CMD_CLIENT_CFLAG) {
+		tc = cmd_find_client(item, args_get(args, 'c'), quiet);
+		if (tc == NULL && !quiet) {
+			retval = CMD_RETURN_ERROR;
+			goto out;
+		}
+	} else if (entry->flags & CMD_CLIENT_TFLAG) {
+		tc = cmd_find_client(item, args_get(args, 't'), quiet);
+		if (tc == NULL && !quiet) {
+			retval = CMD_RETURN_ERROR;
+			goto out;
+		}
+	} else
+		tc = cmd_find_client(item, NULL, 1);
+	item->target_client = tc;
+
 	retval = cmdq_find_flag(item, &item->source, &entry->source);
 	if (retval == CMD_RETURN_ERROR)
 		goto out;
 	retval = cmdq_find_flag(item, &item->target, &entry->target);
 	if (retval == CMD_RETURN_ERROR)
 		goto out;
+
 
 	retval = entry->exec(cmd, item);
 	if (retval == CMD_RETURN_ERROR)
@@ -528,7 +563,7 @@ cmdq_fire_command(struct cmdq_item *item)
 	}
 
 out:
-	item->client = c;
+	item->client = saved;
 	if (retval == CMD_RETURN_ERROR)
 		cmdq_guard(item, "error", flags);
 	else
@@ -592,18 +627,18 @@ cmdq_next(struct client *c)
 	u_int			 items = 0;
 	static u_int		 number;
 
-	if (TAILQ_EMPTY(queue)) {
+	if (TAILQ_EMPTY(&queue->list)) {
 		log_debug("%s %s: empty", __func__, name);
 		return (0);
 	}
-	if (TAILQ_FIRST(queue)->flags & CMDQ_WAITING) {
+	if (TAILQ_FIRST(&queue->list)->flags & CMDQ_WAITING) {
 		log_debug("%s %s: waiting", __func__, name);
 		return (0);
 	}
 
 	log_debug("%s %s: enter", __func__, name);
 	for (;;) {
-		item = TAILQ_FIRST(queue);
+		item = queue->item = TAILQ_FIRST(&queue->list);
 		if (item == NULL)
 			break;
 		log_debug("%s %s: %s (%d), flags %x", __func__, name,
@@ -653,6 +688,7 @@ cmdq_next(struct client *c)
 		}
 		cmdq_remove(item);
 	}
+	queue->item = NULL;
 
 	log_debug("%s %s: exit (empty)", __func__, name);
 	return (items);
@@ -660,6 +696,15 @@ cmdq_next(struct client *c)
 waiting:
 	log_debug("%s %s: exit (wait)", __func__, name);
 	return (items);
+}
+
+/* Get running item if any. */
+struct cmdq_item *
+cmdq_running(struct client *c)
+{
+	struct cmdq_list	*queue = cmdq_get(c);
+
+	return (queue->item);
 }
 
 /* Print a guard line. */

@@ -65,15 +65,14 @@ cmd_if_shell_exec(struct cmd *self, struct cmdq_item *item)
 	struct cmd_find_state		*target = cmdq_get_target(item);
 	struct cmdq_state		*state = cmdq_get_state(item);
 	struct cmd_if_shell_data	*cdata;
-	char				*shellcmd, *cmd;
+	char				*shellcmd, *cmd, *error;
 	const char			*file;
-	struct cmdq_item		*new_item;
-	struct client			*c = cmd_find_client(item, NULL, 1);
+	struct client			*tc = cmdq_get_target_client(item);
 	struct session			*s = target->s;
 	struct cmd_parse_input		 pi;
-	struct cmd_parse_result		*pr;
+	enum cmd_parse_status		 status;
 
-	shellcmd = format_single_from_target(item, args->argv[0], c);
+	shellcmd = format_single_from_target(item, args->argv[0]);
 	if (args_has(args, 'F')) {
 		if (*shellcmd != '0' && *shellcmd != '\0')
 			cmd = args->argv[1];
@@ -88,22 +87,14 @@ cmd_if_shell_exec(struct cmd *self, struct cmdq_item *item)
 		memset(&pi, 0, sizeof pi);
 		cmd_get_source(self, &pi.file, &pi.line);
 		pi.item = item;
-		pi.c = c;
+		pi.c = tc;
 		cmd_find_copy_state(&pi.fs, target);
 
-		pr = cmd_parse_from_string(cmd, &pi);
-		switch (pr->status) {
-		case CMD_PARSE_EMPTY:
-			break;
-		case CMD_PARSE_ERROR:
-			cmdq_error(item, "%s", pr->error);
-			free(pr->error);
+		status = cmd_parse_and_insert(cmd, &pi, item, state, &error);
+		if (status == CMD_PARSE_ERROR) {
+			cmdq_error(item, "%s", error);
+			free(error);
 			return (CMD_RETURN_ERROR);
-		case CMD_PARSE_SUCCESS:
-			new_item = cmdq_get_command(pr->cmdlist, state);
-			cmdq_insert_after(item, new_item);
-			cmd_list_free(pr->cmdlist);
-			break;
 		}
 		return (CMD_RETURN_NORMAL);
 	}
@@ -119,7 +110,7 @@ cmd_if_shell_exec(struct cmd *self, struct cmdq_item *item)
 	if (!args_has(args, 'b'))
 		cdata->client = cmdq_get_client(item);
 	else
-		cdata->client = c;
+		cdata->client = tc;
 	if (cdata->client != NULL)
 		cdata->client->references++;
 
@@ -132,7 +123,7 @@ cmd_if_shell_exec(struct cmd *self, struct cmdq_item *item)
 	cmd_get_source(self, &file, &cdata->input.line);
 	if (file != NULL)
 		cdata->input.file = xstrdup(file);
-	cdata->input.c = c;
+	cdata->input.c = tc;
 	if (cdata->input.c != NULL)
 		cdata->input.c->references++;
 	cmd_find_copy_state(&cdata->input.fs, target);

@@ -1415,6 +1415,9 @@ struct cmd_entry {
 #define CMD_STARTSERVER 0x1
 #define CMD_READONLY 0x2
 #define CMD_AFTERHOOK 0x4
+#define CMD_CLIENT_CFLAG 0x8
+#define CMD_CLIENT_TFLAG 0x10
+#define CMD_CLIENT_CANFAIL 0x20
 	int		 flags;
 
 	enum cmd_retval	 (*exec)(struct cmd *, struct cmdq_item *);
@@ -1683,7 +1686,7 @@ struct spawn_context {
 
 	struct session		 *s;
 	struct winlink		 *wl;
-	struct client		 *c;
+	struct client		 *tc;
 
 	struct window_pane	 *wp0;
 	struct layout_cell	 *lc;
@@ -1795,8 +1798,7 @@ char		*format_expand(struct format_tree *, const char *);
 char		*format_single(struct cmdq_item *, const char *,
 		     struct client *, struct session *, struct winlink *,
 		     struct window_pane *);
-char		*format_single_from_target(struct cmdq_item *, const char *,
-		     struct client *);
+char		*format_single_from_target(struct cmdq_item *, const char *);
 void		 format_defaults(struct format_tree *, struct client *,
 		     struct session *, struct winlink *, struct window_pane *);
 void		 format_defaults_window(struct format_tree *, struct window *);
@@ -2091,6 +2093,12 @@ void	    	 cmd_parse_empty(struct cmd_parse_input *);
 struct cmd_parse_result *cmd_parse_from_file(FILE *, struct cmd_parse_input *);
 struct cmd_parse_result *cmd_parse_from_string(const char *,
 		     struct cmd_parse_input *);
+enum cmd_parse_status cmd_parse_and_insert(const char *,
+		     struct cmd_parse_input *, struct cmdq_item *,
+		     struct cmdq_state *, char **);
+enum cmd_parse_status cmd_parse_and_append(const char *,
+		     struct cmd_parse_input *, struct client *,
+		     struct cmdq_state *, char **);
 struct cmd_parse_result *cmd_parse_from_buffer(const void *, size_t,
 		     struct cmd_parse_input *);
 struct cmd_parse_result *cmd_parse_from_arguments(int, char **,
@@ -2109,6 +2117,7 @@ struct cmdq_list *cmdq_new(void);
 void cmdq_free(struct cmdq_list *);
 const char	 *cmdq_get_name(struct cmdq_item *);
 struct client	 *cmdq_get_client(struct cmdq_item *);
+struct client	 *cmdq_get_target_client(struct cmdq_item *);
 struct cmdq_state *cmdq_get_state(struct cmdq_item *);
 struct cmd_find_state *cmdq_get_target(struct cmdq_item *);
 struct cmd_find_state *cmdq_get_source(struct cmdq_item *);
@@ -2125,6 +2134,7 @@ void		 cmdq_insert_hook(struct session *, struct cmdq_item *,
 		     struct cmd_find_state *, const char *, ...);
 void		 cmdq_continue(struct cmdq_item *);
 u_int		 cmdq_next(struct client *);
+struct cmdq_item *cmdq_running(struct client *);
 void		 cmdq_guard(struct cmdq_item *, const char *, int);
 void printflike(2, 3) cmdq_print(struct cmdq_item *, const char *, ...);
 void printflike(2, 3) cmdq_error(struct cmdq_item *, const char *, ...);
