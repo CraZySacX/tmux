@@ -977,7 +977,7 @@ format_grid_word(struct grid *gd, u_int x, u_int y)
 		if (x == 0) {
 			if (y == 0)
 				break;
-			gl = &gd->linedata[y - 1];
+			gl = grid_peek_line(gd, y - 1);
 			if (~gl->flags & GRID_LINE_WRAPPED)
 				break;
 			y--;
@@ -993,7 +993,7 @@ format_grid_word(struct grid *gd, u_int x, u_int y)
 			if (end == 0 || x == end - 1) {
 				if (y == gd->hsize + gd->sy - 1)
 					break;
-				gl = &gd->linedata[y];
+				gl = grid_peek_line(gd, y);
 				if (~gl->flags & GRID_LINE_WRAPPED)
 					break;
 				y++;
@@ -2689,6 +2689,9 @@ format_defaults_pane(struct format_tree *ft, struct window_pane *wp)
 	format_add(ft, "history_size", "%u", gd->hsize);
 	format_add(ft, "history_limit", "%u", gd->hlimit);
 	format_add_cb(ft, "history_bytes", format_cb_history_bytes);
+
+	format_add(ft, "pane_written", "%zu", wp->written);
+	format_add(ft, "pane_skipped", "%zu", wp->skipped);
 
 	if (window_pane_index(wp, &idx) != 0)
 		fatalx("index not found");

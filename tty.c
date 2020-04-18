@@ -944,6 +944,7 @@ tty_fake_bce(const struct tty *tty, struct window_pane *wp, u_int bg)
 static void
 tty_redraw_region(struct tty *tty, const struct tty_ctx *ctx)
 {
+	struct client		*c = tty->client;
 	struct window_pane	*wp = ctx->wp;
 	struct screen		*s = wp->screen;
 	u_int			 i;
@@ -953,6 +954,7 @@ tty_redraw_region(struct tty *tty, const struct tty_ctx *ctx)
 	 * likely to be followed by some more scrolling.
 	 */
 	if (tty_large_region(tty, ctx)) {
+		log_debug("%s: %s, large redraw of %%%u", __func__, c->name, wp->id);
 		wp->flags |= PANE_REDRAW;
 		return;
 	}
@@ -1438,15 +1440,19 @@ tty_draw_line(struct tty *tty, struct window_pane *wp, struct screen *s,
 void
 tty_sync_start(struct tty *tty)
 {
-	if (tty_get_flags(tty) & TERM_SYNC)
+	if ((~tty->flags & TTY_SYNCING) && (tty_get_flags(tty) & TERM_SYNC)) {
 		tty_puts(tty, "\033P=1s\033\\");
+		tty->flags |= TTY_SYNCING;
+	}
 }
 
 void
 tty_sync_end(struct tty *tty)
 {
-	if (tty_get_flags(tty) & TERM_SYNC)
+	if (tty_get_flags(tty) & TERM_SYNC) {
 		tty_puts(tty, "\033P=2s\033\\");
+		tty->flags &= ~TTY_SYNCING;
+	}
 }
 
 static int
@@ -1480,6 +1486,14 @@ tty_write(void (*cmdfn)(struct tty *, const struct tty_ctx *),
 	TAILQ_FOREACH(c, &clients, entry) {
 		if (!tty_client_ready(c, wp))
 			continue;
+		if (c->flags & CLIENT_REDRAWPANES) {
+			/*
+			 * Redraw is already deferred to redraw another pane -
+			 * redraw this one also when that happens.
+			 */
+			wp->flags |= PANE_REDRAW;
+			break;
+		}
 
 		ctx->bigger = tty_window_offset(&c->tty, &ctx->ox, &ctx->oy,
 		    &ctx->sx, &ctx->sy);
@@ -1739,7 +1753,10 @@ tty_cmd_scrollup(struct tty *tty, const struct tty_ctx *ctx)
 		for (i = 0; i < ctx->num; i++)
 			tty_putc(tty, '\n');
 	} else {
-		tty_cursor(tty, 0, tty->cy);
+		if (tty->cy == UINT_MAX)
+			tty_cursor(tty, 0, 0);
+		else
+			tty_cursor(tty, 0, tty->cy);
 		tty_putcode1(tty, TTYC_INDN, ctx->num);
 	}
 }
@@ -2063,8 +2080,12 @@ tty_region(struct tty *tty, u_int rupper, u_int rlower)
 	 * flag so further output causes a line feed). As a workaround, do an
 	 * explicit move to 0 first.
 	 */
-	if (tty->cx >= tty->sx)
-		tty_cursor(tty, 0, tty->cy);
+	if (tty->cx >= tty->sx) {
+		if (tty->cy == UINT_MAX)
+			tty_cursor(tty, 0, 0);
+		else
+			tty_cursor(tty, 0, tty->cy);
+	}
 
 	tty_putcode2(tty, TTYC_CSR, tty->rupper, tty->rlower);
 	tty->cx = tty->cy = UINT_MAX;
@@ -2143,6 +2164,9 @@ tty_cursor(struct tty *tty, u_int cx, u_int cy)
 	struct tty_term	*term = tty->term;
 	u_int		 thisx, thisy;
 	int		 change;
+
+	if (tty->flags & TTY_BLOCK)
+		return;
 
 	if (cx > tty->sx - 1)
 		cx = tty->sx - 1;
