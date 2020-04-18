@@ -84,6 +84,8 @@ screen_init(struct screen *s, u_int sx, u_int sy, u_int hlimit)
 	s->tabs = NULL;
 	s->sel = NULL;
 
+	s->write_list = NULL;
+
 	screen_reinit(s);
 }
 
@@ -120,6 +122,9 @@ screen_free(struct screen *s)
 	free(s->tabs);
 	free(s->title);
 	free(s->ccolour);
+
+	if (s->write_list != NULL)
+		screen_write_free_list(s);
 
 	if (s->saved_grid != NULL)
 		grid_destroy(s->saved_grid);
@@ -221,6 +226,9 @@ screen_resize_cursor(struct screen *s, u_int sx, u_int sy, int reflow,
 {
 	u_int	tcx, tcy;
 
+	if (s->write_list != NULL)
+		screen_write_free_list(s);
+
 	if (cx == NULL)
 		cx = &tcx;
 	*cx = s->cx;
@@ -259,6 +267,9 @@ screen_resize_cursor(struct screen *s, u_int sx, u_int sy, int reflow,
 	}
 	log_debug("%s: cursor finished at %u,%u = %u,%u", __func__, s->cx,
 	    s->cy, *cx, *cy);
+
+	if (s->write_list != NULL)
+		screen_write_make_list(s);
 }
 
 /* Resize screen. */

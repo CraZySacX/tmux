@@ -771,6 +771,8 @@ struct screen {
 
 	bitstr_t		*tabs;
 	struct screen_sel	*sel;
+
+	struct screen_write_collect_line *write_list;
 };
 
 /* Screen write context. */
@@ -782,7 +784,6 @@ struct screen_write_ctx {
 	int			 sync;
 
 	struct screen_write_collect_item *item;
-	struct screen_write_collect_line *list;
 	u_int			 scrolled;
 	u_int			 bg;
 
@@ -936,8 +937,8 @@ struct window_pane {
 	char		*searchstr;
 	int		 searchregex;
 
-	u_int		 written;
-	u_int		 skipped;
+	size_t		 written;
+	size_t		 skipped;
 
 	TAILQ_ENTRY(window_pane) entry;
 	RB_ENTRY(window_pane) tree_entry;
@@ -2382,6 +2383,8 @@ void	 grid_view_delete_cells(struct grid *, u_int, u_int, u_int, u_int);
 char	*grid_view_string_cells(struct grid *, u_int, u_int, u_int);
 
 /* screen-write.c */
+void	 screen_write_make_list(struct screen *);
+void	 screen_write_free_list(struct screen *);
 void	 screen_write_start(struct screen_write_ctx *, struct window_pane *,
 	     struct screen *);
 void	 screen_write_stop(struct screen_write_ctx *);
