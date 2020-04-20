@@ -1724,11 +1724,15 @@ server_client_check_redraw(struct client *c)
 			log_debug("redraw timer started");
 			evtimer_add(&ev, &tv);
 		}
-		if (new_flags & CLIENT_REDRAWPANES) {
+
+		if (~c->flags & CLIENT_REDRAWWINDOW) {
 			c->redraw_panes = 0;
 			TAILQ_FOREACH(wp, &w->panes, entry) {
-				if (wp->flags & PANE_REDRAW)
+				if (wp->flags & PANE_REDRAW) {
+					log_debug("%s: pane %%%u needs redraw",
+					    c->name, wp->id);
 					c->redraw_panes |= (1 << bit);
+				}
 				if (++bit == 64) {
 					/*
 					 * If more that 64 panes, give up and
@@ -1739,6 +1743,8 @@ server_client_check_redraw(struct client *c)
 					break;
 				}
 			}
+			if (c->redraw_panes != 0)
+				c->flags |= CLIENT_REDRAWPANES;
 		}
 		c->flags |= new_flags;
 		return;
@@ -1759,6 +1765,7 @@ server_client_check_redraw(struct client *c)
 				redraw = 1;
 			else if (c->flags & CLIENT_REDRAWPANES)
 				redraw = !!(c->redraw_panes & (1 << bit));
+			bit++;
 			if (!redraw)
 				continue;
 			log_debug("%s: redrawing pane %%%u", __func__, wp->id);
