@@ -256,6 +256,8 @@ enum tty_code_code {
 	TTYC_BOLD,
 	TTYC_CIVIS,
 	TTYC_CLEAR,
+	TTYC_CLMG,
+	TTYC_CMG,
 	TTYC_CNORM,
 	TTYC_COLORS,
 	TTYC_CR,
@@ -276,12 +278,14 @@ enum tty_code_code {
 	TTYC_DIM,
 	TTYC_DL,
 	TTYC_DL1,
+	TTYC_DSMG,
 	TTYC_E3,
 	TTYC_ECH,
 	TTYC_ED,
 	TTYC_EL,
 	TTYC_EL1,
 	TTYC_ENACS,
+	TTYC_ENMG,
 	TTYC_FSL,
 	TTYC_HOME,
 	TTYC_HPA,
@@ -447,11 +451,11 @@ enum tty_code_code {
 	TTYC_SITM,
 	TTYC_SMACS,
 	TTYC_SMCUP,
-	TTYC_SMOL,
 	TTYC_SMKX,
+	TTYC_SMOL,
 	TTYC_SMSO,
-	TTYC_SMULX,
 	TTYC_SMUL,
+	TTYC_SMULX,
 	TTYC_SMXX,
 	TTYC_SS,
 	TTYC_SYNC,
@@ -460,7 +464,7 @@ enum tty_code_code {
 	TTYC_U8,
 	TTYC_VPA,
 	TTYC_XENL,
-	TTYC_XT,
+	TTYC_XT
 };
 
 /* Message codes. */
@@ -1249,7 +1253,7 @@ struct tty {
 #define TTY_FOCUS 0x40
 #define TTY_BLOCK 0x80
 #define TTY_HAVEDA 0x100
-#define TTY_HAVEDSR 0x200
+#define TTY_HAVEXDA 0x200
 #define TTY_SYNCING 0x400
 	int		 flags;
 
@@ -2045,6 +2049,8 @@ long long	 args_strtonum(struct args *, u_char, long long, long long,
 		     char **);
 long long	 args_percentage(struct args *, u_char, long long,
 		     long long, long long, char **);
+long long	 args_string_percentage(const char *, long long, long long,
+		     long long, char **);
 
 /* cmd-find.c */
 int		 cmd_find_target(struct cmd_find_state *, struct cmdq_item *,
@@ -2621,7 +2627,8 @@ typedef void (*mode_tree_each_cb)(void *, void *, struct client *, key_code);
 u_int	 mode_tree_count_tagged(struct mode_tree_data *);
 void	*mode_tree_get_current(struct mode_tree_data *);
 void	 mode_tree_expand_current(struct mode_tree_data *);
-void	 mode_tree_set_current(struct mode_tree_data *, uint64_t);
+void	 mode_tree_expand(struct mode_tree_data *, uint64_t);
+int	 mode_tree_set_current(struct mode_tree_data *, uint64_t);
 void	 mode_tree_each_tagged(struct mode_tree_data *, mode_tree_each_cb,
 	     struct client *, key_code, int);
 void	 mode_tree_down(struct mode_tree_data *, int);
