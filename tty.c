@@ -330,13 +330,12 @@ tty_start_tty(struct tty *tty)
 		tty_puts(tty, "\033[?1006l\033[?1005l");
 	}
 
-	if (tty_term_flag(tty->term, TTYC_XT)) {
-		if (options_get_number(global_options, "focus-events")) {
-			tty->flags |= TTY_FOCUS;
-			tty_puts(tty, "\033[?1004h");
-		}
-		tty_puts(tty, "\033[?7727h");
+	if (options_get_number(global_options, "focus-events")) {
+		tty->flags |= TTY_FOCUS;
+		tty_raw(tty, tty_term_string(tty->term, TTYC_ENFCS));
 	}
+	if (tty_term_flag(tty->term, TTYC_XT))
+		tty_puts(tty, "\033[?7727h");
 
 	evtimer_set(&tty->start_timer, tty_start_timer_callback, tty);
 	evtimer_add(&tty->start_timer, &tv);
@@ -407,7 +406,7 @@ tty_stop_tty(struct tty *tty)
 			tty_raw(tty, tty_term_string1(tty->term, TTYC_SS, 0));
 	}
 	if (tty->mode & MODE_BRACKETPASTE)
-		tty_raw(tty, "\033[?2004l");
+		tty_raw(tty, tty_term_string(tty->term, TTYC_DSBP));
 	if (*tty->ccolour != '\0')
 		tty_raw(tty, tty_term_string(tty->term, TTYC_CR));
 
@@ -417,13 +416,12 @@ tty_stop_tty(struct tty *tty)
 		tty_raw(tty, "\033[?1006l\033[?1005l");
 	}
 
-	if (tty_term_flag(tty->term, TTYC_XT)) {
-		if (tty->flags & TTY_FOCUS) {
-			tty->flags &= ~TTY_FOCUS;
-			tty_raw(tty, "\033[?1004l");
-		}
-		tty_raw(tty, "\033[?7727l");
+	if (tty->flags & TTY_FOCUS) {
+		tty->flags &= ~TTY_FOCUS;
+		tty_raw(tty, tty_term_string(tty->term, TTYC_DSFCS));
 	}
+	if (tty_term_flag(tty->term, TTYC_XT))
+		tty_raw(tty, "\033[?7727l");
 
 	if (tty_use_margin(tty))
 		tty_raw(tty, tty_term_string(tty->term, TTYC_DSMG));
@@ -676,7 +674,8 @@ tty_update_mode(struct tty *tty, int mode, struct screen *s)
 		mode &= ~MODE_CURSOR;
 
 	changed = mode ^ tty->mode;
-	log_debug("%s: update mode %x to %x", c->name, tty->mode, mode);
+	if (changed != 0)
+		log_debug("%s: update mode %x to %x", c->name, tty->mode, mode);
 
 	if (changed & MODE_BLINKING) {
 		if (tty_term_has(tty->term, TTYC_CVVIS))
@@ -729,9 +728,9 @@ tty_update_mode(struct tty *tty, int mode, struct screen *s)
 	}
 	if (changed & MODE_BRACKETPASTE) {
 		if (mode & MODE_BRACKETPASTE)
-			tty_puts(tty, "\033[?2004h");
+			tty_putcode(tty, TTYC_ENBP);
 		else
-			tty_puts(tty, "\033[?2004l");
+			tty_putcode(tty, TTYC_DSBP);
 	}
 	tty->mode = mode;
 }

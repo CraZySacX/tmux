@@ -65,9 +65,12 @@ struct winlink;
 /* Client-server protocol version. */
 #define PROTOCOL_VERSION 8
 
-/* Default configuration files. */
+/* Default configuration files and socket paths. */
 #ifndef TMUX_CONF
 #define TMUX_CONF "/etc/tmux.conf:~/.tmux.conf"
+#endif
+#ifndef TMUX_SOCK
+#define TMUX_SOCK "$TMUX_TMPDIR:" _PATH_TMP
 #endif
 
 /* Minimum layout cell size, NOT including border lines. */
@@ -278,6 +281,8 @@ enum tty_code_code {
 	TTYC_DIM,
 	TTYC_DL,
 	TTYC_DL1,
+	TTYC_DSBP,
+	TTYC_DSFCS,
 	TTYC_DSMG,
 	TTYC_E3,
 	TTYC_ECH,
@@ -285,6 +290,8 @@ enum tty_code_code {
 	TTYC_EL,
 	TTYC_EL1,
 	TTYC_ENACS,
+	TTYC_ENBP,
+	TTYC_ENFCS,
 	TTYC_ENMG,
 	TTYC_FSL,
 	TTYC_HOME,
@@ -1503,6 +1510,7 @@ struct client {
 
 	char		*term_name;
 	int		 term_features;
+	char		*term_type;
 
 	char		*ttyname;
 	struct tty	 tty;
@@ -1748,6 +1756,8 @@ const char	*sig2name(int);
 const char	*find_cwd(void);
 const char	*find_home(void);
 const char	*getversion(void);
+void		 expand_paths(const char *, char ***, u_int *);
+
 
 /* proc.c */
 struct imsg;
@@ -2025,6 +2035,7 @@ const char	*tty_term_describe(struct tty_term *, enum tty_code_code);
 void		 tty_add_features(int *, const char *, const char *);
 const char	*tty_get_features(int);
 int		 tty_apply_features(struct tty_term *, int);
+void		 tty_default_features(int *, const char *, u_int);
 
 /* tty-acs.c */
 int		 tty_acs_needed(struct tty *);
