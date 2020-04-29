@@ -334,7 +334,7 @@ tty_start_tty(struct tty *tty)
 		tty->flags |= TTY_FOCUS;
 		tty_raw(tty, tty_term_string(tty->term, TTYC_ENFCS));
 	}
-	if (tty_term_flag(tty->term, TTYC_XT))
+	if (tty->term->flags & TERM_VT100LIKE)
 		tty_puts(tty, "\033[?7727h");
 
 	evtimer_set(&tty->start_timer, tty_start_timer_callback, tty);
@@ -357,7 +357,7 @@ tty_send_requests(struct tty *tty)
 	if (~tty->flags & TTY_STARTED)
 		return;
 
-	if (tty_term_flag(tty->term, TTYC_XT)) {
+	if (tty->term->flags & TERM_VT100LIKE) {
 		if (~tty->flags & TTY_HAVEDA)
 			tty_puts(tty, "\033[>c");
 		if (~tty->flags & TTY_HAVEXDA)
@@ -420,7 +420,7 @@ tty_stop_tty(struct tty *tty)
 		tty->flags &= ~TTY_FOCUS;
 		tty_raw(tty, tty_term_string(tty->term, TTYC_DSFCS));
 	}
-	if (tty_term_flag(tty->term, TTYC_XT))
+	if (tty->term->flags & TERM_VT100LIKE)
 		tty_raw(tty, "\033[?7727l");
 
 	if (tty_use_margin(tty))
@@ -2687,30 +2687,34 @@ tty_try_colour(struct tty *tty, int colour, const char *type)
 }
 
 static void
+tty_window_default_style(struct grid_cell *gc, struct window_pane *wp)
+{
+	memcpy(gc, &grid_default_cell, sizeof *gc);
+	gc->fg = wp->fg;
+	gc->bg = wp->bg;
+}
+
+static void
 tty_default_colours(struct grid_cell *gc, struct window_pane *wp)
 {
 	struct options	*oo = wp->options;
-	struct style	*style, *active_style;
 	int		 c;
 
 	if (wp->flags & PANE_STYLECHANGED) {
 		wp->flags &= ~PANE_STYLECHANGED;
 
-		active_style = options_get_style(oo, "window-active-style");
-		style = options_get_style(oo, "window-style");
-
-		style_copy(&wp->cached_active_style, active_style);
-		style_copy(&wp->cached_style, style);
-	} else {
-		active_style = &wp->cached_active_style;
-		style = &wp->cached_style;
+		tty_window_default_style(&wp->cached_active_gc, wp);
+		style_add(&wp->cached_active_gc, oo, "window-active-style",
+		    NULL);
+		tty_window_default_style(&wp->cached_gc, wp);
+		style_add(&wp->cached_gc, oo, "window-style", NULL);
 	}
 
 	if (gc->fg == 8) {
-		if (wp == wp->window->active && active_style->gc.fg != 8)
-			gc->fg = active_style->gc.fg;
+		if (wp == wp->window->active && wp->cached_active_gc.fg != 8)
+			gc->fg = wp->cached_active_gc.fg;
 		else
-			gc->fg = style->gc.fg;
+			gc->fg = wp->cached_gc.fg;
 
 		if (gc->fg != 8) {
 			c = window_pane_get_palette(wp, gc->fg);
@@ -2720,10 +2724,10 @@ tty_default_colours(struct grid_cell *gc, struct window_pane *wp)
 	}
 
 	if (gc->bg == 8) {
-		if (wp == wp->window->active && active_style->gc.bg != 8)
-			gc->bg = active_style->gc.bg;
+		if (wp == wp->window->active && wp->cached_active_gc.bg != 8)
+			gc->bg = wp->cached_active_gc.bg;
 		else
-			gc->bg = style->gc.bg;
+			gc->bg = wp->cached_gc.bg;
 
 		if (gc->bg != 8) {
 			c = window_pane_get_palette(wp, gc->bg);

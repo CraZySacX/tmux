@@ -495,8 +495,8 @@ window_set_active_pane(struct window *w, struct window_pane *wp, int notify)
 void
 window_redraw_active_switch(struct window *w, struct window_pane *wp)
 {
-	struct style	*sy1, *sy2;
-	int		 c1, c2;
+	struct grid_cell	*gc1, *gc2;
+	int			 c1, c2;
 
 	if (wp == w->active)
 		return;
@@ -506,18 +506,18 @@ window_redraw_active_switch(struct window *w, struct window_pane *wp)
 		 * If the active and inactive styles or palettes are different,
 		 * need to redraw the panes.
 		 */
-		sy1 = &wp->cached_style;
-		sy2 = &wp->cached_active_style;
-		if (!style_equal(sy1, sy2))
+		gc1 = &wp->cached_gc;
+		gc2 = &wp->cached_active_gc;
+		if (!grid_cells_look_equal(gc1, gc2))
 			wp->flags |= PANE_REDRAW;
 		else {
-			c1 = window_pane_get_palette(wp, sy1->gc.fg);
-			c2 = window_pane_get_palette(wp, sy2->gc.fg);
+			c1 = window_pane_get_palette(wp, gc1->fg);
+			c2 = window_pane_get_palette(wp, gc2->fg);
 			if (c1 != c2)
 				wp->flags |= PANE_REDRAW;
 			else {
-				c1 = window_pane_get_palette(wp, sy1->gc.bg);
-				c2 = window_pane_get_palette(wp, sy2->gc.bg);
+				c1 = window_pane_get_palette(wp, gc1->bg);
+				c2 = window_pane_get_palette(wp, gc2->bg);
 				if (c1 != c2)
 					wp->flags |= PANE_REDRAW;
 			}
@@ -872,6 +872,9 @@ window_pane_create(struct window *w, u_int sx, u_int sy, u_int hlimit)
 	wp->fd = -1;
 	wp->event = NULL;
 
+	wp->fg = 8;
+	wp->bg = 8;
+
 	TAILQ_INIT(&wp->modes);
 
 	wp->layout_cell = NULL;
@@ -1106,6 +1109,7 @@ window_pane_set_mode(struct window_pane *wp, struct window_pane *swp,
 	wp->screen = wme->screen;
 	wp->flags |= (PANE_REDRAW|PANE_CHANGED);
 
+	server_redraw_window_borders(wp->window);
 	server_status_window(wp->window);
 	notify_pane("pane-mode-changed", wp);
 
@@ -1137,6 +1141,7 @@ window_pane_reset_mode(struct window_pane *wp)
 	}
 	wp->flags |= (PANE_REDRAW|PANE_CHANGED);
 
+	server_redraw_window_borders(wp->window);
 	server_status_window(wp->window);
 	notify_pane("pane-mode-changed", wp);
 }

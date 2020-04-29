@@ -73,7 +73,7 @@ menu_add_item(struct menu *menu, const struct menu_item *item,
 		return;
 
 	if (fs != NULL)
-		s = format_single(qitem, item->name, c, fs->s, fs->wl, fs->wp);
+		s = format_single_from_state(qitem, item->name, c, fs);
 	else
 		s = format_single(qitem, item->name, c, NULL, NULL, NULL);
 	if (*s == '\0') { /* no item if empty after format expanded */
@@ -91,7 +91,7 @@ menu_add_item(struct menu *menu, const struct menu_item *item,
 	cmd = item->command;
 	if (cmd != NULL) {
 		if (fs != NULL)
-			s = format_single(qitem, cmd, c, fs->s, fs->wl, fs->wp);
+			s = format_single_from_state(qitem, cmd, c, fs);
 		else
 			s = format_single(qitem, cmd, c, NULL, NULL, NULL);
 	} else
@@ -151,8 +151,7 @@ menu_draw_cb(struct client *c, __unused struct screen_redraw_ctx *ctx0)
 	u_int			 i, px = md->px, py = md->py;
 	struct grid_cell	 gc;
 
-	memcpy(&gc, &grid_default_cell, sizeof gc);
-	style_apply(&gc, c->session->curw->window->options, "mode-style");
+	style_apply(&gc, c->session->curw->window->options, "mode-style", NULL);
 
 	screen_write_start(&ctx, NULL, s);
 	screen_write_clearscreen(&ctx, 8);

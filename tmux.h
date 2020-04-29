@@ -898,6 +898,9 @@ struct window_pane {
 	u_int		 xoff;
 	u_int		 yoff;
 
+	int		 fg;
+	int		 bg;
+
 	int		 flags;
 #define PANE_REDRAW 0x1
 #define PANE_DROP 0x2
@@ -930,8 +933,8 @@ struct window_pane {
 
 	struct input_ctx *ictx;
 
-	struct style	 cached_style;
-	struct style	 cached_active_style;
+	struct grid_cell cached_gc;
+	struct grid_cell cached_active_gc;
 	int		*palette;
 
 	int		 pipe_fd;
@@ -951,6 +954,9 @@ struct window_pane {
 
 	size_t		 written;
 	size_t		 skipped;
+
+	int		 border_gc_set;
+	struct grid_cell border_gc;
 
 	TAILQ_ENTRY(window_pane) entry;
 	RB_ENTRY(window_pane) tree_entry;
@@ -1202,6 +1208,7 @@ struct tty_term {
 #define TERM_DECSLRM 0x4
 #define TERM_DECFRA 0x8
 #define TERM_RGBCOLOURS 0x10
+#define TERM_VT100LIKE 0x20
 	int		 flags;
 
 	LIST_ENTRY(tty_term) entry;
@@ -1663,7 +1670,6 @@ enum options_table_type {
 	OPTIONS_TABLE_COLOUR,
 	OPTIONS_TABLE_FLAG,
 	OPTIONS_TABLE_CHOICE,
-	OPTIONS_TABLE_STYLE,
 	OPTIONS_TABLE_COMMAND
 };
 
@@ -1675,12 +1681,13 @@ enum options_table_type {
 
 #define OPTIONS_TABLE_IS_ARRAY 0x1
 #define OPTIONS_TABLE_IS_HOOK 0x2
+#define OPTIONS_TABLE_IS_STYLE 0x4
 
 struct options_table_entry {
 	const char		 *name;
 	enum options_table_type	  type;
 	int			  scope;
-	int                       flags;
+	int			  flags;
 
 	u_int			  minimum;
 	u_int			  maximum;
@@ -1719,7 +1726,7 @@ struct spawn_context {
 	const char		 *name;
 	char			**argv;
 	int			  argc;
-	struct environ           *environ;
+	struct environ		 *environ;
 
 	int			  idx;
 	const char		 *cwd;
@@ -1826,7 +1833,14 @@ char		*format_expand(struct format_tree *, const char *);
 char		*format_single(struct cmdq_item *, const char *,
 		     struct client *, struct session *, struct winlink *,
 		     struct window_pane *);
+char		*format_single_from_state(struct cmdq_item *, const char *,
+		    struct client *, struct cmd_find_state *);
 char		*format_single_from_target(struct cmdq_item *, const char *);
+struct format_tree *format_create_defaults(struct cmdq_item *, struct client *,
+		     struct session *, struct winlink *, struct window_pane *);
+struct format_tree *format_create_from_state(struct cmdq_item *,
+		     struct client *, struct cmd_find_state *);
+struct format_tree *format_create_from_target(struct cmdq_item *);
 void		 format_defaults(struct format_tree *, struct client *,
 		     struct session *, struct winlink *, struct window_pane *);
 void		 format_defaults_window(struct format_tree *, struct window *);
@@ -1892,18 +1906,17 @@ struct options_entry *options_match_get(struct options *, const char *, int *,
 		     int, int *);
 const char	*options_get_string(struct options *, const char *);
 long long	 options_get_number(struct options *, const char *);
-struct style	*options_get_style(struct options *, const char *);
 struct options_entry * printflike(4, 5) options_set_string(struct options *,
 		     const char *, int, const char *, ...);
 struct options_entry *options_set_number(struct options *, const char *,
 		     long long);
-struct options_entry *options_set_style(struct options *, const char *, int,
-		     const char *);
 int		 options_scope_from_name(struct args *, int,
 		     const char *, struct cmd_find_state *, struct options **,
 		     char **);
 int		 options_scope_from_flags(struct args *, int,
 		     struct cmd_find_state *, struct options **, char **);
+struct style	*options_string_to_style(struct options *, const char *,
+		     struct format_tree *);
 
 /* options-table.c */
 extern const struct options_table_entry options_table[];
@@ -2130,7 +2143,7 @@ enum cmd_retval	 cmd_attach_session(struct cmdq_item *, const char *, int, int,
 		     int, const char *, int);
 
 /* cmd-parse.c */
-void	    	 cmd_parse_empty(struct cmd_parse_input *);
+void		 cmd_parse_empty(struct cmd_parse_input *);
 struct cmd_parse_result *cmd_parse_from_file(FILE *, struct cmd_parse_input *);
 struct cmd_parse_result *cmd_parse_from_string(const char *,
 		     struct cmd_parse_input *);
@@ -2221,8 +2234,8 @@ void	 file_fire_done(struct client_file *);
 void	 file_fire_read(struct client_file *);
 int	 file_can_print(struct client *);
 void printflike(2, 3) file_print(struct client *, const char *, ...);
-void 	 file_vprint(struct client *, const char *, va_list);
-void 	 file_print_buffer(struct client *, void *, size_t);
+void	 file_vprint(struct client *, const char *, va_list);
+void	 file_print_buffer(struct client *, void *, size_t);
 void printflike(2, 3) file_error(struct client *, const char *, ...);
 void	 file_write(struct client *, const char *, int, const void *, size_t,
 	     client_file_cb, void *);
@@ -2357,6 +2370,8 @@ int	 attributes_fromstring(const char *);
 extern const struct grid_cell grid_default_cell;
 void	 grid_empty_line(struct grid *, u_int, u_int);
 int	 grid_cells_equal(const struct grid_cell *, const struct grid_cell *);
+int	 grid_cells_look_equal(const struct grid_cell *,
+	     const struct grid_cell *);
 struct grid *grid_create(u_int, u_int, u_int);
 void	 grid_destroy(struct grid *);
 int	 grid_compare(struct grid *, struct grid *);
@@ -2718,10 +2733,10 @@ struct session	*session_find_by_id_str(const char *);
 struct session	*session_find_by_id(u_int);
 struct session	*session_create(const char *, const char *, const char *,
 		     struct environ *, struct options *, struct termios *);
-void		 session_destroy(struct session *, int,  const char *);
+void		 session_destroy(struct session *, int,	 const char *);
 void		 session_add_ref(struct session *, const char *);
 void		 session_remove_ref(struct session *, const char *);
-int		 session_check_name(const char *);
+char		*session_check_name(const char *);
 void		 session_update_activity(struct session *, struct timeval *);
 struct session	*session_next_session(struct session *);
 struct session	*session_previous_session(struct session *);
@@ -2788,7 +2803,7 @@ struct menu	*menu_create(const char *);
 void		 menu_add_items(struct menu *, const struct menu_item *,
 		    struct cmdq_item *, struct client *,
 		    struct cmd_find_state *);
-void 		 menu_add_item(struct menu *, const struct menu_item *,
+void		 menu_add_item(struct menu *, const struct menu_item *,
 		    struct cmdq_item *, struct client *,
 		    struct cmd_find_state *);
 void		 menu_free(struct menu *);
@@ -2811,12 +2826,12 @@ int		 popup_display(int, struct cmdq_item *, u_int, u_int, u_int,
 int		 style_parse(struct style *,const struct grid_cell *,
 		     const char *);
 const char	*style_tostring(struct style *);
+void		 style_add(struct grid_cell *, struct options *,
+		     const char *, struct format_tree *);
 void		 style_apply(struct grid_cell *, struct options *,
-		     const char *);
-int		 style_equal(struct style *, struct style *);
+		     const char *, struct format_tree *);
 void		 style_set(struct style *, const struct grid_cell *);
 void		 style_copy(struct style *, struct style *);
-int		 style_is_default(struct style *);
 
 /* spawn.c */
 struct winlink	*spawn_window(struct spawn_context *, char **);

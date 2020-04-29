@@ -59,6 +59,7 @@ style_parse(struct style *sy, const struct grid_cell *base, const char *in)
 		return (0);
 	style_copy(&saved, sy);
 
+	log_debug("%s: %s", __func__, in);
 	do {
 		while (*in != '\0' && strchr(delimiters, *in) != NULL)
 			in++;
@@ -71,6 +72,7 @@ style_parse(struct style *sy, const struct grid_cell *base, const char *in)
 		memcpy(tmp, in, end);
 		tmp[end] = '\0';
 
+		log_debug("%s: %s", __func__, tmp);
 		if (strcasecmp(tmp, "default") == 0) {
 			sy->gc.fg = base->fg;
 			sy->gc.bg = base->bg;
@@ -258,17 +260,37 @@ style_tostring(struct style *sy)
 	return (s);
 }
 
-/* Apply a style. */
+/* Apply a style on top of the given style. */
 void
-style_apply(struct grid_cell *gc, struct options *oo, const char *name)
+style_add(struct grid_cell *gc, struct options *oo, const char *name,
+    struct format_tree *ft)
 {
-	struct style	*sy;
+	struct style		*sy;
+	struct format_tree	*ft0 = NULL;
 
-	memcpy(gc, &grid_default_cell, sizeof *gc);
-	sy = options_get_style(oo, name);
-	gc->fg = sy->gc.fg;
-	gc->bg = sy->gc.bg;
+	if (ft == NULL)
+		ft = ft0 = format_create(NULL, NULL, 0, FORMAT_NOJOBS);
+
+	sy = options_string_to_style(oo, name, ft);
+	if (sy == NULL)
+		sy = &style_default;
+	if (sy->gc.fg != 8)
+		gc->fg = sy->gc.fg;
+	if (sy->gc.bg != 8)
+		gc->bg = sy->gc.bg;
 	gc->attr |= sy->gc.attr;
+
+	if (ft0 != NULL)
+		format_free(ft0);
+}
+
+/* Apply a style on top of the default style. */
+void
+style_apply(struct grid_cell *gc, struct options *oo, const char *name,
+    struct format_tree *ft)
+{
+	memcpy(gc, &grid_default_cell, sizeof *gc);
+	style_add(gc, oo, name, ft);
 }
 
 /* Initialize style from cell. */
@@ -284,31 +306,4 @@ void
 style_copy(struct style *dst, struct style *src)
 {
 	memcpy(dst, src, sizeof *dst);
-}
-
-/* Check if two styles are (visibly) the same. */
-int
-style_equal(struct style *sy1, struct style *sy2)
-{
-	struct grid_cell	*gc1 = &sy1->gc;
-	struct grid_cell	*gc2 = &sy2->gc;
-
-	if (gc1->fg != gc2->fg)
-		return (0);
-	if (gc1->bg != gc2->bg)
-		return (0);
-	if ((gc1->attr & STYLE_ATTR_MASK) != (gc2->attr & STYLE_ATTR_MASK))
-		return (0);
-	if (sy1->fill != sy2->fill)
-		return (0);
-	if (sy1->align != sy2->align)
-		return (0);
-	return (1);
-}
-
-/* Is this style default? */
-int
-style_is_default(struct style *sy)
-{
-	return (style_equal(sy, &style_default));
 }
