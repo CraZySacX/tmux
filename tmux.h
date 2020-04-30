@@ -1604,6 +1604,8 @@ struct client {
 #define PROMPT_INCREMENTAL 0x4
 #define PROMPT_NOFORMAT 0x8
 #define PROMPT_KEY 0x10
+#define PROMPT_WINDOW 0x20
+#define PROMPT_TARGET 0x40
 	int		 prompt_flags;
 
 	struct session	*session;
@@ -2436,8 +2438,6 @@ void	 screen_write_vnputs(struct screen_write_ctx *, ssize_t,
 	     const struct grid_cell *, const char *, va_list);
 void	 screen_write_putc(struct screen_write_ctx *, const struct grid_cell *,
 	     u_char);
-void	 screen_write_copy(struct screen_write_ctx *, struct screen *, u_int,
-	     u_int, u_int, u_int, bitstr_t *, const struct grid_cell *);
 void	 screen_write_fast_copy(struct screen_write_ctx *, struct screen *,
 	     u_int, u_int, u_int, u_int);
 void	 screen_write_hline(struct screen_write_ctx *, u_int, int, int);
@@ -2799,6 +2799,7 @@ __dead void printflike(1, 2) fatalx(const char *, ...);
 
 /* menu.c */
 #define MENU_NOMOUSE 0x1
+#define MENU_TAB 0x2
 struct menu	*menu_create(const char *);
 void		 menu_add_items(struct menu *, const struct menu_item *,
 		    struct cmdq_item *, struct client *,
