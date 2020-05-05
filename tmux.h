@@ -2090,6 +2090,8 @@ char		*args_print(struct args *);
 char		*args_escape(const char *);
 int		 args_has(struct args *, u_char);
 const char	*args_get(struct args *, u_char);
+u_char		 args_first(struct args *, struct args_entry **);
+u_char		 args_next(struct args_entry **);
 const char	*args_first_value(struct args *, u_char, struct args_value **);
 const char	*args_next_value(struct args_value **);
 long long	 args_strtonum(struct args *, u_char, long long, long long,
@@ -2525,8 +2527,7 @@ void	 screen_set_path(struct screen *, const char *);
 void	 screen_push_title(struct screen *);
 void	 screen_pop_title(struct screen *);
 void	 screen_resize(struct screen *, u_int, u_int, int);
-void	 screen_resize_cursor(struct screen *, u_int, u_int, int, int, u_int *,
-	     u_int *);
+void	 screen_resize_cursor(struct screen *, u_int, u_int, int, int, int);
 void	 screen_set_selection(struct screen *, u_int, u_int, u_int, u_int,
 	     u_int, int, struct grid_cell *);
 void	 screen_clear_selection(struct screen *);
