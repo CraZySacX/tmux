@@ -65,8 +65,6 @@ static void	tty_emulate_repeat(struct tty *, enum tty_code_code,
 		    enum tty_code_code, u_int);
 static void	tty_repeat_space(struct tty *, u_int);
 static void	tty_draw_pane(struct tty *, const struct tty_ctx *, u_int);
-static void	tty_cell(struct tty *, const struct grid_cell *,
-		    const struct grid_cell *, int *);
 static void	tty_default_attributes(struct tty *, const struct grid_cell *,
 		    int *, u_int);
 
@@ -154,16 +152,21 @@ tty_read_callback(__unused int fd, __unused short events, void *data)
 {
 	struct tty	*tty = data;
 	struct client	*c = tty->client;
+	const char	*name = c->name;
 	size_t		 size = EVBUFFER_LENGTH(tty->in);
 	int		 nread;
 
 	nread = evbuffer_read(tty->in, tty->fd, -1);
 	if (nread == 0 || nread == -1) {
+		if (nread == 0)
+			log_debug("%s: read closed", name);
+		else
+			log_debug("%s: read error: %s", name, strerror(errno));
 		event_del(&tty->event_in);
 		server_client_lost(tty->client);
 		return;
 	}
-	log_debug("%s: read %d bytes (already %zu)", c->name, nread, size);
+	log_debug("%s: read %d bytes (already %zu)", name, nread, size);
 
 	while (tty_keys_next(tty))
 		;
@@ -688,8 +691,7 @@ tty_update_mode(struct tty *tty, int mode, struct screen *s)
 	}
 	if (s != NULL && tty->cstyle != s->cstyle) {
 		if (tty_term_has(tty->term, TTYC_SS)) {
-			if (s->cstyle == 0 &&
-			    tty_term_has(tty->term, TTYC_SE))
+			if (s->cstyle == 0 && tty_term_has(tty->term, TTYC_SE))
 				tty_putcode(tty, TTYC_SE);
 			else
 				tty_putcode1(tty, TTYC_SS, s->cstyle);
@@ -787,7 +789,7 @@ tty_window_offset1(struct tty *tty, u_int *ox, u_int *oy, u_int *sx, u_int *sy)
 {
 	struct client		*c = tty->client;
 	struct window		*w = c->session->curw->window;
-	struct window_pane	*wp = w->active;
+	struct window_pane	*wp = server_client_get_pane(c);
 	u_int			 cx, cy, lines;
 
 	lines = status_line_size(c);
@@ -1239,7 +1241,7 @@ static const struct grid_cell *
 tty_check_codeset(struct tty *tty, const struct grid_cell *gc)
 {
 	static struct grid_cell	new;
-	u_int			n;
+	int			c;
 
 	/* Characters less than 0x7f are always fine, no matter what. */
 	if (gc->data.size == 1 && *gc->data.data < 0x7f)
@@ -1248,14 +1250,21 @@ tty_check_codeset(struct tty *tty, const struct grid_cell *gc)
 	/* UTF-8 terminal and a UTF-8 character - fine. */
 	if (tty->client->flags & CLIENT_UTF8)
 		return (gc);
+	memcpy(&new, gc, sizeof new);
+
+	/* See if this can be mapped to an ACS character. */
+	c = tty_acs_reverse_get(tty, gc->data.data, gc->data.size);
+	if (c != -1) {
+		utf8_set(&new.data, c);
+		new.attr |= GRID_ATTR_CHARSET;
+		return (&new);
+	}
 
 	/* Replace by the right number of underscores. */
-	n = gc->data.width;
-	if (n > UTF8_SIZE)
-		n = UTF8_SIZE;
-	memcpy(&new, gc, sizeof new);
-	new.data.size = n;
-	memset(new.data.data, '_', n);
+	new.data.size = gc->data.width;
+	if (new.data.size > UTF8_SIZE)
+		new.data.size = UTF8_SIZE;
+	memset(new.data.data, '_', new.data.size);
 	return (&new);
 }
 
@@ -1920,7 +1929,7 @@ tty_cmd_syncstart(struct tty *tty, __unused const struct tty_ctx *ctx)
 	tty_sync_start(tty);
 }
 
-static void
+void
 tty_cell(struct tty *tty, const struct grid_cell *gc,
     const struct grid_cell *defaults, int *palette)
 {
@@ -1936,12 +1945,13 @@ tty_cell(struct tty *tty, const struct grid_cell *gc,
 	if (gc->flags & GRID_FLAG_PADDING)
 		return;
 
-	/* Set the attributes. */
-	tty_attributes(tty, gc, defaults, palette);
-
-	/* Get the cell and if ASCII write with putc to do ACS translation. */
+	/* Check the output codeset and apply attributes. */
 	gcp = tty_check_codeset(tty, gc);
+	tty_attributes(tty, gcp, defaults, palette);
+
+	/* If it is a single character, write with putc to handle ACS. */
 	if (gcp->data.size == 1) {
+		tty_attributes(tty, gcp, defaults, palette);
 		if (*gcp->data.data < 0x20 || *gcp->data.data == 0x7f)
 			return;
 		tty_putc(tty, *gcp->data.data);
