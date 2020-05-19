@@ -231,7 +231,7 @@ static const key_code tty_default_xterm_modifiers[] = {
 	KEYC_CTRL,
 	KEYC_SHIFT|KEYC_CTRL,
 	KEYC_META|KEYC_IMPLIED_META|KEYC_CTRL,
-	KEYC_SHIFT|KEYC_META|KEYC_CTRL
+	KEYC_SHIFT|KEYC_META|KEYC_IMPLIED_META|KEYC_CTRL
 };
 
 /*
@@ -878,7 +878,7 @@ tty_keys_extended_key(struct tty *tty, const char *buf, size_t len,
 	}
 	if (end == len)
 		return (1);
-	if (buf[end] != '~' && buf[end] != 'u')
+	if (end == sizeof tmp || (buf[end] != '~' && buf[end] != 'u'))
 		return (-1);
 
 	/* Copy to the buffer. */
@@ -1293,7 +1293,7 @@ tty_keys_extended_device_attributes(struct tty *tty, const char *buf,
 	else if (strncmp(tmp, "tmux ", 5) == 0)
 		tty_default_features(&c->term_features, "tmux", 0);
 	else if (strncmp(tmp, "XTerm(", 6) == 0)
-		tty_default_features(&c->term_features, "xterm", 0);
+		tty_default_features(&c->term_features, "XTerm", 0);
 	else if (strncmp(tmp, "mintty ", 7) == 0)
 		tty_default_features(&c->term_features, "mintty", 0);
 	log_debug("%s: received extended DA %.*s", c->name, (int)*size, buf);

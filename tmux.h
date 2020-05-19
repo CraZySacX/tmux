@@ -292,6 +292,7 @@ enum tty_code_code {
 	TTYC_DL,
 	TTYC_DL1,
 	TTYC_DSBP,
+	TTYC_DSEKS,
 	TTYC_DSFCS,
 	TTYC_DSMG,
 	TTYC_E3,
@@ -301,6 +302,7 @@ enum tty_code_code {
 	TTYC_EL1,
 	TTYC_ENACS,
 	TTYC_ENBP,
+	TTYC_ENEKS,
 	TTYC_ENFCS,
 	TTYC_ENMG,
 	TTYC_FSL,
@@ -577,8 +579,8 @@ struct msg_write_close {
 #define MODE_CURSOR 0x1
 #define MODE_INSERT 0x2
 #define MODE_KCURSOR 0x4
-#define MODE_KKEYPAD 0x8	/* set = application, clear = number */
-#define MODE_WRAP 0x10		/* whether lines wrap */
+#define MODE_KKEYPAD 0x8
+#define MODE_WRAP 0x10
 #define MODE_MOUSE_STANDARD 0x20
 #define MODE_MOUSE_BUTTON 0x40
 #define MODE_BLINKING 0x80
@@ -589,6 +591,7 @@ struct msg_write_close {
 #define MODE_MOUSE_ALL 0x1000
 #define MODE_ORIGIN 0x2000
 #define MODE_CRLF 0x4000
+#define MODE_KEXTENDED 0x8000
 
 #define ALL_MODES 0xffffff
 #define ALL_MOUSE_MODES (MODE_MOUSE_STANDARD|MODE_MOUSE_BUTTON|MODE_MOUSE_ALL)
@@ -1009,12 +1012,18 @@ struct window {
 	u_int		 xpixel;
 	u_int		 ypixel;
 
+	u_int		 new_sx;
+	u_int		 new_sy;
+	u_int		 new_xpixel;
+	u_int		 new_ypixel;
+
 	int		 flags;
 #define WINDOW_BELL 0x1
 #define WINDOW_ACTIVITY 0x2
 #define WINDOW_SILENCE 0x4
 #define WINDOW_ZOOMED 0x8
 #define WINDOW_WASZOOMED 0x10
+#define WINDOW_RESIZE 0x20
 #define WINDOW_ALERTFLAGS (WINDOW_BELL|WINDOW_ACTIVITY|WINDOW_SILENCE)
 
 	int		 alerts_queued;
@@ -1286,7 +1295,7 @@ struct tty {
 /* 0x8 unused */
 #define TTY_STARTED 0x10
 #define TTY_OPENED 0x20
-#define TTY_FOCUS 0x40
+/* 0x40 unused */
 #define TTY_BLOCK 0x80
 #define TTY_HAVEDA 0x100
 #define TTY_HAVEXDA 0x200
