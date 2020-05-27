@@ -1275,8 +1275,10 @@ process_key:
 append_key:
 	if (key <= 0x1f || key >= KEYC_BASE)
 		return (0);
-	if (utf8_split(key, &tmp) != UTF8_DONE)
-		return (0);
+	if (key <= 0x7f)
+		utf8_set(&tmp, key);
+	else
+		utf8_to_data(key, &tmp);
 
 	c->prompt_buffer = xreallocarray(c->prompt_buffer, size + 2,
 	    sizeof *c->prompt_buffer);
