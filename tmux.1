@@ -2112,7 +2112,8 @@ and
 .Ic display-panes-active-colour
 session options.
 The indicator is closed when a key is pressed (unless
-.Fl N is given) or
+.Fl N
+is given) or
 .Ar duration
 milliseconds have passed.
 If
@@ -4637,7 +4638,12 @@ of the variable respectively.
 .Ql q:\&
 will escape
 .Xr sh 1
-special characters.
+special characters or with an
+.Ql e
+suffix, escape hash characters (so
+.Ql #
+becomes
+.Ql ## ).
 .Ql E:\&
 will expand the format twice, for example
 .Ql #{E:status-left}
