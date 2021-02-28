@@ -1368,8 +1368,11 @@ format_cb_client_termname(struct format_tree *ft)
 static void *
 format_cb_client_termtype(struct format_tree *ft)
 {
-	if (ft->c != NULL)
+	if (ft->c != NULL) {
+		if (ft->c->term_type == NULL)
+			return (xstrdup(""));
 		return (xstrdup(ft->c->term_type));
+	}
 	return (NULL);
 }
 
@@ -4696,12 +4699,12 @@ format_defaults(struct format_tree *ft, struct client *c, struct session *s,
 	if (c != NULL && s != NULL && c->session != s)
 		log_debug("%s: session does not match", __func__);
 
-	if (s != NULL)
-		ft->type = FORMAT_TYPE_SESSION;
+	if (wp != NULL)
+		ft->type = FORMAT_TYPE_PANE;
 	else if (wl != NULL)
 		ft->type = FORMAT_TYPE_WINDOW;
-	else if (wp != NULL)
-		ft->type = FORMAT_TYPE_PANE;
+	else if (s != NULL)
+		ft->type = FORMAT_TYPE_SESSION;
 	else
 		ft->type = FORMAT_TYPE_UNKNOWN;
 
